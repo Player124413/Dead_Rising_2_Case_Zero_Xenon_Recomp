@@ -76,4 +76,6 @@
     <string name="gamepad_missing">Сенсорные кнопки отключены. Подключите геймпад перед запуском.</string>
     <string name="choose_files">Выбор файлов</string>
     <string name="update_unsigned">Обновления отключены в диагностических сборках. Используйте игровой APK, подписанный постоянным ключом релиза.</string>
+    <string name="bluetooth_controller">Доступ к Steam Controller BLE</string>
+    <string name="bluetooth_hint">Необязательно: разрешите доступ к устройствам поблизости до запуска игры для Steam Controller BLE. Обычные Android-геймпады и сенсорное управление работают без этого разрешения.</string>
 </resources>

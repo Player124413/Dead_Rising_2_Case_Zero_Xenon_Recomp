@@ -108,6 +108,14 @@ public final class LauncherActivity extends Activity implements InstallService.L
         slider(controls, R.string.touch_opacity, "touch_opacity", 20, 90, 65);
         Ui.button(this, controls, R.string.edit_layout, () -> startActivity(new Intent(this, LayoutActivity.class)));
         controls.addView(Ui.text(this, getString(R.string.controller_hint), 13, Ui.MUTED));
+        Ui.button(this, controls, R.string.bluetooth_controller, () -> {
+            if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, 401);
+            } else try { startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)); }
+            catch (ActivityNotFoundException e) { Ui.error(this, e); }
+        });
+        controls.addView(Ui.text(this, getString(R.string.bluetooth_hint), 12, Ui.MUTED));
         LinearLayout data = Ui.card(this, content, R.string.data);
         prefToggle(data, R.string.show_fps, "show_fps", false);
         Ui.button(this, data, R.string.open_files, this::browseFiles);

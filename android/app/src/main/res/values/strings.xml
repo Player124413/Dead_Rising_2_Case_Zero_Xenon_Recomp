@@ -76,4 +76,6 @@
     <string name="gamepad_missing">Touch controls are off. Connect a controller before playing.</string>
     <string name="choose_files">Choose files</string>
     <string name="update_unsigned">Updates are disabled for diagnostic builds. Use a game APK signed with the same release key.</string>
+    <string name="bluetooth_controller">Steam Controller BLE access</string>
+    <string name="bluetooth_hint">Optional: grant Nearby devices before launching to use SDL’s Steam Controller BLE support. Ordinary Android gamepads and touch do not need this permission.</string>
 </resources>

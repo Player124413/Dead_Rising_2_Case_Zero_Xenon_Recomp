@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -61,7 +61,7 @@ jobs:
           ./gradlew --no-daemon --stacktrace testDiagnosticDebugUnitTest lintDiagnosticDebug 2>&1 | tee ../launcher-tests.log
       - name: Expose launcher errors through the checks API
         if: failure()
-        run: python3 tools/ci/report_failure.py launcher-tests.log
+        run: python3 tools/ci/report_failure.py launcher-tests.log android/app/build/reports/lint-results-*.txt
       - name: Keep JVM and lint reports
         if: always()
         uses: actions/upload-artifact@v4

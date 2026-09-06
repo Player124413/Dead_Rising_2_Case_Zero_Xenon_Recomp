@@ -16,6 +16,23 @@ public final class GameActivity extends SDLActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastTime, lastFrames;
     private boolean nativeLoaded;
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+        // SDL 2.32 passes this Activity as HIDDeviceManager's Context. Its
+        // two-argument receiver registration needs explicit flags at target 35.
+        // Only protected Bluetooth ACL broadcasts are exported; the mixed USB
+        // filter includes our private PendingIntent and MUST NOT be exported.
+        if (Build.VERSION.SDK_INT >= 33) {
+            boolean protectedBluetooth = filter.countActions() > 0;
+            for (int i = 0; i < filter.countActions(); ++i) {
+                String action = filter.getAction(i);
+                protectedBluetooth &= android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)
+                    || android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action);
+            }
+            return super.registerReceiver(receiver, filter,
+                protectedBluetooth ? Context.RECEIVER_EXPORTED : Context.RECEIVER_NOT_EXPORTED);
+        }
+        return super.registerReceiver(receiver, filter);
+    }
     @Override protected String[] getLibraries() { return new String[]{"SDL2", "main"}; }
     @Override protected String[] getArguments() {
         // This runs on SDL's native-start thread, before SDL_main. Preparation
