@@ -11,57 +11,74 @@ unchanged); if either is EVER rebuilt, refresh its hash here before attaching.
 
 ---
 
-## Dead Rising 2: Case Zero — Native PC Port v1.0.0
+Play **Dead Rising 2: Case Zero** — the Xbox 360 exclusive prologue to Dead
+Rising 2 — natively on Windows and Linux. Not an emulator: the game's code is
+translated ahead of time and runs directly on your PC, with a Vulkan renderer,
+real Xbox 360 audio, and native keyboard/mouse support.
 
-The first public release. The game is **completable start to finish** on both
-platforms — this build has been played through end to end.
+> **The port is essentially complete.** The game is **100% playable start to
+> finish** — this build has been completed end to end on both platforms — and
+> should look right in nearly all places. A few minor issues remain (below);
+> none block progress.
 
 **You must own the game.** No Capcom content ships in this repository or in
-these downloads; the runtime reads everything from your own XBLA package
-(quickstart in the README — drop the package in `assets/package/` and run).
+these downloads — the game runs from your own copy of the XBLA package.
 
-### What's in the port, by era
+### How to install
 
-- **Boot → title → gameplay**: the whole XBLA title statically recompiled
-  (57,822 PowerPC functions → C++), kernel HLE written against hardware
-  captures, honest-failure discipline throughout.
-- **Renderer**: Vulkan 1.3, translated Xenos shaders (the disc's own 1,265
-  pixel shaders built at first run), EDRAM tiling semantics, cube-map
-  snapshots, deferred scoped clears, parallel command recording, and a frame
-  that holds 60 fps at 1440p through the heaviest crowds on the dev machine.
-- **Audio**: real XMA decoding through ffmpeg — music, speech, effects,
-  hardware-looped voices, and the cinematics that gate on them.
-- **Built for the long haul**: texture memory recycles over a full playthrough
-  (no whitening or slowdown on marathon sessions).
-- **Save/load**: full round trip, relocated to the per-user directory.
-- **60 fps**: the title's own present-interval configuration, surfaced as a
-  setting (30/60/90/120/240/480 or off).
-- **Keyboard/mouse**: native DR2-PC-style bindings fed to the title's own
-  PC input layer (shipped dormant in the 360 build), raw mouse camera,
-  our-own-art key-cap prompt icons with live device-follow, and a
-  player-editable `kbmap.txt`.
-- **The PC options screen**: revived from the dormant layout the 360 build
-  ships — resolution (720p–5K, applies live), display mode, vsync, shadow
-  quality. **MSAA 2x** is the default; `CZ_VK_MSAA=0` restores single-sample.
-- **First run**: fully self-contained — in-process package extract, disc
-  shader build, and generation of the patched menu/prompt assets from your
-  data, under one progress window. A pipeline pre-warm seed makes even the
-  first session smooth.
+1. Download the build for your system below and unpack it anywhere.
+2. Copy your own XBLA package file (~825 MB, no file extension — on the
+   console it lives at
+   `Content/0000000000000000/58410A8D/000D0000/<long name>`) into the
+   unpacked folder's `assets/package/`, or just drag it onto the launcher.
+3. Run `cz_runtime.exe` (Windows) or `./cz_runtime` (Linux). The first run
+   sets everything up by itself under a progress bar — unpacks your package,
+   prepares all 1,265 shaders (~10 s), and generates the menu/prompt assets
+   from your data. Later launches start straight into the game.
+
+Saves and settings live outside the game folder (Windows:
+`Saved Games\Dead Rising 2 Case Zero\`; Linux:
+`~/.local/share/Dead Rising 2 Case Zero/`), so reinstalling never touches
+them. A README inside the bundle covers troubleshooting.
+
+### Highlights
+
+- **The whole game** — Still Creek, combo weapons, cinematics, save/load,
+  completable start to finish.
+- **60 fps** (the game's own hidden mode, surfaced) — the original 30 fps
+  pacing stays available as a setting, along with higher caps.
+- **Native keyboard/mouse** with the Dead Rising 2 PC control scheme, raw
+  mouse look, and real key icons on every prompt — prompts switch between
+  key and controller art automatically based on what you touched last.
+  Rebindable via `kbmap.txt`. Any controller SDL recognizes works too.
+- **The restored PC options screen**: the Xbox build ships a dormant PC
+  graphics menu; this port revives it in-game — resolution from 720p to 5K
+  (applies live, no restart), display mode, vsync, shadow quality.
+- **MSAA 2x** anti-aliasing by default, adjustable field of view, a settings
+  launcher, and a pipeline pre-warm so even the first session plays smoothly.
+- **Real Xbox 360 audio** (XMA) through ffmpeg — music, speech, effects,
+  looping ambience, and the cinematics that depend on them.
+- **Built for marathon sessions**: texture memory recycles over a full
+  playthrough — no whitening or slow degradation on long runs.
+- Under the hood: 57,822 PowerPC functions statically recompiled to native
+  code, the 360 GPU's command stream executed on Vulkan 1.3, and a first run
+  that builds everything it needs from your own copy of the game.
 
 ### Requirements
 
-- GPU + driver with **Vulkan 1.3** (dynamic rendering).
-- **Windows** 10+ x86-64, or **Linux** x86-64 with **glibc ≥ 2.43**.
+- GPU + driver with **Vulkan 1.3**.
+- **Windows** 10+ x86-64, or **Linux** x86-64 with **glibc 2.43 or newer**.
 - Your own copy of the Dead Rising 2: Case Zero XBLA package (~825 MB).
 - ~2 GB free disk after first-run unpacking.
 
-### Known limitations
+### Known issues (minor)
 
+- A subtle **shading flicker on Chuck's hair** in motion; real hardware does
+  not show it and it is being tracked.
+- The occasional spot may shade slightly differently than the console.
 - **Linux glibc floor** (2.43): older distributions refuse to start with a
-  `GLIBC_x.yz not found` message. An AppImage/old-base build is planned.
-- **No macOS** yet (test hardware, not architecture — an ARM64 path exists).
-- A subtle **hair-shading flicker** on Chuck in motion
-  (`docs/hair-flicker-part92.md`) — real hardware does not show it; open.
+  `GLIBC_x.yz not found` message. An AppImage-style build is planned.
+- **No macOS build yet** — awaits test hardware, nothing structural.
 
 ### Legal
 
