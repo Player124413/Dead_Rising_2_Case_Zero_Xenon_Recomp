@@ -993,9 +993,17 @@ was ONE `memmem`). §3.3 ANSWERED: the pre-warm seed does NOT collapse under MSA
 757 of 1,365, exactly the part-85 baseline, and `PipelineKey` carries no sample count so
 the seed is MSAA-agnostic by construction. §4 DONE: public README at the root, day-1
 README preserved at `docs/dev-readme-day1.md`. `docs/release-notes-v1.0.0.md` is the
-paste-ready Release body with both SHA-256s. WHAT REMAINS NEEDS THE OPERATOR (§6's owed
-list): §3.1 bundle save round-trip both platforms, §3.2 KB/M-from-bundle in the same
-sitting, then tag v1.0.0 + create the Release + attach + flip visibility.** The KB/M struggle prompt was
+paste-ready Release body with both SHA-256s. **AND AS OF THE SAME EVENING THE RELEASE
+IS TAGGED: v1.0.0 is pushed at the release commit**, after a same-day fix round the
+operator drove by playing (the device-following prompt wording — MASH is
+keyboard-only now, `phase5-notes`-grade record in the 74ab694 commit message; the
+always-on mouse camera, toggle retired; and three Case West back-imports: XMA
+hardware loops, LRU texture-slot recycling, the Q glyph for in-game Y — its §6
+addenda 1-4 are the records). Both artifacts (commit 407eb79 binaries) sit in
+`dist/` together, checksums in the FINAL `docs/release-notes-v1.0.0.md`. **WHAT
+REMAINS IS THE OPERATOR'S THREE CLICKS — plan addendum 4: draft the GitHub Release
+at tag v1.0.0, paste the notes body + attach both artifacts, flip visibility
+(checking CI green first — no `gh` on any box, so the checks tab is theirs alone).** The KB/M struggle prompt was
 fixed the same day (three rounds, operator-verified: bare A↔D caps + MASH label;
 `docs/kbm-struggle-prompt-plan.md` carries the executed record, and the .bcs string
 table is now REBUILDABLE — not size-pinned — freeing string edits from same-length).
