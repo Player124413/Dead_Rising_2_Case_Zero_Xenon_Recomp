@@ -18,9 +18,13 @@ phone. Do not relabel the CI diagnostics APK as the game.
 - Multi-pointer Xbox-style touch controls, analog sticks, optional swipe camera,
   size/opacity and a screen-relative layout editor. Physical SDL gamepads remain
   available; touching a controller can hide the overlay. Input is cleared on
-  cancellation/backgrounding/disconnect from the view.
+  cancellation/backgrounding/disconnect from the view. Android selects the
+  controller path / Xbox prompts, not the desktop-specific native keyboard hooks.
+  Steam Controller BLE has an optional Nearby-devices permission; ordinary
+  Android gamepads and touch do not need it.
 - A separate `:runtime` process, matching SDL Java/native versions, app-private
-  paths, native logs, lifecycle pause checkpoints and ARM64 crash PCs. The
+  paths, native logs, lifecycle pause checkpoints, a monotonic pause-aware guest
+  clock, owned native-window references / surface recreation and ARM64 crash PCs. The
   desktop runtime's intentional `_Exit` does not terminate the launcher.
 - Vulkan feature/descriptor-limit checks, system driver by default and explicit
   opt-in import of a trusted ARM64 Adreno `.so` or `meta.json` driver ZIP through
@@ -118,8 +122,12 @@ identity. CI never substitutes a debug signature for a production signature or
 publishes stub APKs as game releases.
 
 Licenses are staged under APK `assets/licenses/`. Before distributing a game APK,
-include any corresponding LGPL source/relink materials required by the bundled
-components. See `THIRD_PARTY.md`.
+include `CaseZero-Android-LGPL-sources.zip`, produced by
+`python3 tools/android/package_sources.py`, with equivalent download access.
+FFmpeg and LZX are separate replaceable libraries. See
+[LGPL source and replacement instructions](android-lgpl.md) and `THIRD_PARTY.md`.
+Release packaging refuses missing signing configuration; it never substitutes
+an unsigned or debug-signed release.
 
 ## CI and what green means
 
@@ -127,12 +135,18 @@ components. See `THIRD_PARTY.md`.
   pushes as well as PRs. Windows uses a pinned vcpkg checkout and its supported
   file binary cache, not the removed `x-gha` provider.
 - `checks.yml`: actionlint, portable ASan/UBSan C++ tests and Python packaging /
-  resource-contract tests. Uses synthetic data only.
+  resource-contract tests; a parallel job compiles the launcher and runs its
+  JVM importer/settings/lease tests plus Android lint without waiting for DXC.
+  Uses synthetic data only.
 - `android.yml`: source-builds target ARM64 native libraries and DXC, runs JVM
   importer tests and Android lint, packages a **diagnostic** APK, checks its
   ABI/ELF segment alignment/required libraries/no-game-data contract and Android
-  signature. Logs are artifacts even on failure. No game-data secrets or private
+  signature. Exact LGPL sources accompany the APK. Logs are artifacts even on failure. No game-data secrets or private
   repositories are required; it does not automatically publish GitHub releases.
+  Heavy native builds finish rather than being cancelled on each Java-only fix.
+  A successful dependency build records input/output hashes: reinstalling an
+  identical NDK on another runner cannot trigger a full DXC rebuild merely
+  because the SDK headers have newer timestamps.
 
 Forks may have Actions disabled by GitHub until their owner enables them. A
 workflow that has not run is **unverified**, not green. Network/toolchain failures
@@ -147,11 +161,21 @@ ctest --test-dir build/portable-tests --output-on-failure
 python3 -m unittest discover -s tools/tests -v
 ```
 
-C++ covers BC1–BC5 palettes/alpha/edge dimensions/invalid lengths, touch-state
+C++ covers pause-clock monotonicity under concurrent transitions,
+BC1–BC5 palettes/alpha/edge dimensions/invalid lengths, touch-state
 clamping/merging/release/concurrent access, and synthetic STFS title IDs,
 truncation, traversal, duplicate names, invalid parents, symlink escapes and
 cyclic chains. JVM tests cover ZIP-slip, case collisions, archive budgets,
-interruption-safe replacement, XEX identity/bounds and atomic settings.
+interruption-safe replacement, XEX identity/bounds, atomic settings, exclusive
+process leases and native-resolution constraints. Python also tests ELF bounds /
+alignment, the support-asset allowlist, exact source archives and completed-build
+cache invalidation.
+
+The app's lint remains enabled with `abortOnError`. `android/app/lint.xml` names
+only the specific unmodified SDL files where cross-callback permission gates /
+the Activity's receiver override are not visible to static analysis, and SDL's
+unused audio-recording path. No microphone permission is requested by the game.
+These exceptions do not suppress checks in the launcher's own code.
 
 ## Required device release gate (not yet completed)
 
