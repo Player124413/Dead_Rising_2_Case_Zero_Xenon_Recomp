@@ -3376,6 +3376,27 @@ CZ_NO_OVERLAY_GEN=1  **the off switch for first-run overlay generation** (releas
                   generation: a run that asked for the shipped bytes should not spend a
                   first-run producing files it will ignore. `cz_runtime --gen-overlays`
                   runs the same generation by hand and is the identity-gate driver.
+
+CZ_VK_NO_TEX_LRU=1  **the control arm for bindless texture-slot recycling** (imported
+                  from Case West c24176f, 2026-09-05). By default a full bindless heap
+                  evicts the least-recently-used texture whose slot no in-flight frame
+                  can reference and hands its slot to the new texture; with this set, a
+                  full heap serves the 1x1 white dummy from then on — the behaviour
+                  that whitened everything past 65,536 textures on a completion run.
+                  Validated here at CZ_VK_MAX_TEXTURES=256 on the DebugJump crowd
+                  route under CZ_VK_SYNC_VALIDATION=1: 215 recycles, 215 deferred
+                  destroys (exact pairing), 0 hazards; 0 recycles at the default cap.
+
+CZ_XMA_NO_LOOP=1  **the control arm for XMA hardware loops** (imported from Case West
+                  7811618). By default a consumed input buffer whose context carries
+                  loopCount != 0 rewinds to the buffer start and stays valid (0xFF
+                  never decrements — the infinite sentinel); with this set, every
+                  consume clears the valid bit — the old behaviour, under which the
+                  guest saw a looping voice finish and re-created its context ~2/s.
+                  Case Zero DOES hit this path: ~5,900 loop sustains on one ordinary
+                  boot-to-gameplay run, first context at loopCount=254 — the same
+                  signature as Case West's repeating laser-gun cue. One-shots
+                  (loopCount==0) are byte-for-byte unchanged on either setting.
 ```
 
 **And a file, not a variable: `cz_defaults.env` beside the executable.** The packaging

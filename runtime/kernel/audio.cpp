@@ -380,6 +380,7 @@ struct XmaCtx
     //          input_buffer_0_valid:1 (+20), input_buffer_1_valid:1 (+21),
     //          output_buffer_block_count:5 (+22), output_buffer_write_offset:5 (+27)
     uint32_t in0Packets() const { return dw[0] & 0xFFF; }
+    uint32_t loopCount() const { return (dw[0] >> 12) & 0xFF; } // 0xFF = infinite
     bool in0Valid() const { return (dw[0] >> 20) & 1; }
     bool in1Valid() const { return (dw[0] >> 21) & 1; }
     uint32_t outBlocks() const { return (dw[0] >> 22) & 0x1F; }
@@ -615,6 +616,36 @@ bool XmaDecodeOnePacket(unsigned i, uint32_t va, XmaHostCtx& hc, XmaCtx& c)
         // parks on the buffer it has and resumes when the guest re-flags it, which is
         // precisely the transition sub_8285EFE0 polls for. For a genuine double-buffered
         // stream this is a no-op, because there the other buffer IS valid.
+        // HARDWARE LOOP (loopCount != 0) — imported from Case West (7811618), where
+        // it was found the expensive way: a looping voice invalidated on consume
+        // like a one-shot makes the guest see it stop and RE-CREATE the context
+        // ~2/s — their laser-gun equip cue repeated until the loop was honoured
+        // (Xenia, the oracle, plays it clean). The hardware wraps the read pointer
+        // back to the buffer start instead of finishing: rewind, KEEP the valid
+        // bit, count the loop down (0xFF is the infinite sentinel, never
+        // decremented). Reached ONLY when loopCount>0, so every one-shot
+        // (loopCount==0 — normal SFX, and the single-buffer cinematic streaming
+        // the census below established) is byte-for-byte unchanged and cannot
+        // regress. CZ_XMA_NO_LOOP=1 restores the old clear-valid-always behaviour
+        // as the control arm.
+        static const bool noLoop = getenv("CZ_XMA_NO_LOOP") != nullptr;
+        if (c.loopCount() != 0 && !noLoop)
+        {
+            if (c.loopCount() != 0xFF)   // finite: count this iteration down
+            {
+                const uint32_t lc = c.loopCount() - 1;
+                c.dw[0] = (c.dw[0] & ~(0xFFu << 12)) | (lc << 12);
+            }
+            c.setInReadOffsetBits(0);    // rewind to the loop start; valid stays set
+            XmaWriteDword(va, 0, c.dw[0]);
+            XmaWriteDword(va, 2, c.dw[2]);
+            static std::atomic<uint32_t> looped{0};
+            if ((looped++ % 256) == 0)
+                fprintf(stderr, "[xma] hardware loop sustained on ctx %u "
+                                "(loopCount now %u); CZ_XMA_NO_LOOP=1 disables\n",
+                        i, c.loopCount());
+            return false;
+        }
         const bool otherValid = cur ? c.in0Valid() : c.in1Valid();
         if (cur)
             c.setIn1Valid(false);
