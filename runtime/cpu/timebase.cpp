@@ -78,7 +78,14 @@ void AdvanceFrame()
 
 bool init()
 {
+#if defined(__aarch64__)
+    // Architectural counter frequency does not change with big/LITTLE migration
+    // or DVFS. Unlike a sleep-based estimate it cannot include an Android suspend.
+    asm volatile("mrs %0, cntfrq_el0" : "=r"(host_hz));
+    if (!host_hz) host_hz = calibrate();
+#else
     host_hz = calibrate();
+#endif
     if (getenv("CZ_DETERMINISTIC_CLOCK"))
     {
         deterministic = true;

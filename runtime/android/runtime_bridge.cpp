@@ -20,9 +20,10 @@
 
 int CzRuntimeMain(int argc, char** argv);
 namespace {
-std::mutex statusMutex, pauseMutex;
+std::mutex statusMutex, pauseMutex, sessionMutex;
 std::condition_variable pauseChanged;
-bool paused = false, quitting = false;
+bool paused = false;
+std::atomic<bool> quitting{false};
 ANativeWindow* nativeWindow = nullptr;
 std::atomic<bool> surfaceChanged{false};
 bool customDriver = false;
@@ -30,6 +31,7 @@ std::string status = "Starting";
 std::filesystem::path files;
 std::atomic<uint64_t> frames{0};
 void Session(const char* state) {
+    std::lock_guard<std::mutex> lock(sessionMutex);
     if (files.empty()) return;
     std::ofstream out(files / "last-session.txt", std::ios::trunc);
     out << state << '\n';
@@ -37,6 +39,9 @@ void Session(const char* state) {
 void Env(const char* key, const std::string& value) { setenv(key, value.c_str(), 1); }
 }
 void Android_Progress(const char* label, float fraction) {
+    if (quitting.load()) {
+        Android_MarkStopped(); fflush(nullptr); std::_Exit(0);
+    }
     std::lock_guard<std::mutex> lock(statusMutex);
     status = std::string(label ? label : "") + "\n" + std::to_string(fraction);
 }
@@ -112,7 +117,7 @@ Java_com_casezero_launcher_RuntimeBridge_status(JNIEnv* env, jclass) {
 // so the desktop runtime's intentional _Exit never kills the launcher.
 extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** argv) {
     if (argc != 4 || (std::string(argv[1]) != "--android" && std::string(argv[1]) != "--android-smoke")) return 2;
-    files = argv[2];
+    { std::lock_guard<std::mutex> lock(sessionMutex); files = argv[2]; }
     const std::string libs = argv[3];
     if (!files.is_absolute() || !std::filesystem::is_directory(files)) return 2;
     std::error_code ec;
@@ -137,6 +142,7 @@ extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** 
     Env("SDL_TOUCH_MOUSE_EVENTS", "0"); Env("SDL_MOUSE_TOUCH_EVENTS", "0");
     Env("SDL_ANDROID_TRAP_BACK_BUTTON", "1");
     Env("SDL_ANDROID_BLOCK_ON_PAUSE", "0"); // native GPU pause checkpoint is independent of SDL's pump
+    Env("SDL_ANDROID_BLOCK_ON_PAUSE_PAUSEAUDIO", "1");
     Env("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
     Env("CZ_VK_MSAA", "1"); // one sample = no multisampling
     std::ifstream settings(files / "android.env");

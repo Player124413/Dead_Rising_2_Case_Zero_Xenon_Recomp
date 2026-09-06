@@ -12547,6 +12547,15 @@ bool CreateSwapchain(uint32_t wantW, uint32_t wantH)
     }
     sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     sci.preTransform = caps.currentTransform;
+#ifdef __ANDROID__
+    // This path blits an upright image; it does not pre-rotate a render pass.
+    // Let Android's compositor apply display rotation rather than claiming that
+    // the blit already applied a 90/270-degree currentTransform.
+    if (caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+        sci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    else if (caps.currentTransform != VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+        Android_Fatal("Android surface requires unsupported pre-rotated presentation");
+#endif
     sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     if (!(caps.supportedCompositeAlpha & sci.compositeAlpha))
         for (uint32_t bit = 1; bit <= VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR; bit <<= 1)

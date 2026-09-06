@@ -149,7 +149,7 @@ public final class GameActivity extends SDLActivity {
         touch.release();
         new AlertDialog.Builder(this).setTitle(R.string.stop_game).setMessage(R.string.stop_game_hint)
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.continue_action, (d, w) -> {
-                RuntimeBridge.pause(false); RuntimeBridge.quit();
+                RuntimeBridge.quit(); finish();
             }).show();
     }
     @Override public boolean dispatchTouchEvent(MotionEvent e) {
@@ -169,7 +169,13 @@ public final class GameActivity extends SDLActivity {
     @Override protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if (nativeLoaded) { RuntimeBridge.quit(); touch.release(); }
+        // SDL joins its native thread here. A shader compiler / stalled driver
+        // must not keep Android's UI thread blocked indefinitely during teardown.
+        // Give normal shutdown a chance, then terminate ONLY the :runtime process.
+        java.util.concurrent.ScheduledExecutorService exitGuard = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        exitGuard.schedule(() -> android.os.Process.killProcess(android.os.Process.myPid()), 2, java.util.concurrent.TimeUnit.SECONDS);
         super.onDestroy();
+        exitGuard.shutdownNow();
         if (session != null) try { session.close(); } catch (IOException e) { android.util.Log.w("CaseZero", "Session lock", e); }
         // The runtime contains process-lifetime guest threads and globals. Never
         // reuse this process for a second SDL session after a normal native return.
