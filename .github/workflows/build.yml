@@ -24,8 +24,15 @@ name: build
 
 on:
   push:
-    branches: [master]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # The upstream commits the vendored patches apply onto (their merge-bases with
@@ -36,9 +43,14 @@ env:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.6'
 
       - name: install build dependencies
         run: |
@@ -74,43 +86,51 @@ jobs:
             -DXENON_ROOT="$PWD/../XenonRecomp" \
             -DXENON_BUILD="$PWD/../XenonRecomp/build" \
             -DXENOS_ROOT="$PWD/../XenosRecomp"
-          cmake --build runtime/build -j"$(nproc)"
+          cmake --build runtime/build -j2
 
       - name: smoke against the stub image
         run: runtime/build/cz_runtime --smoke
 
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.6'
 
       - uses: ilammy/msvc-dev-cmd@v1
 
       - name: install ninja
         run: choco install -y ninja
 
-      # vcpkg with the GitHub Actions binary cache: the first run builds ffmpeg
-      # and SDL2 from source (slow); every later run restores binaries. The
-      # export step must run FIRST — vcpkg reads the cache credentials from the
-      # environment at install time.
-      - name: expose the GHA cache to vcpkg
-        uses: actions/github-script@v7
+      # vcpkg's old x-gha binary provider was removed upstream. Cache its
+      # supported files provider instead, and pin ports/tooling together.
+      - uses: actions/cache@v4
         with:
-          # Both URL spellings: GitHub's cache service v2 moved the endpoint to
-          # ACTIONS_RESULTS_URL, and a vcpkg looking for the old name on a new
-          # runner silently runs with NO cache — which is a ~80-minute ffmpeg
-          # rebuild on every push, indistinguishable from a slow cache hit.
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          path: ${{ github.workspace }}/.vcpkg-cache
+          key: windows-vcpkg-b322364f-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: windows-vcpkg-b322364f-
 
-      - name: install SDL2, ffmpeg, Vulkan via vcpkg
+      - name: install pinned vcpkg and native dependencies
+        shell: pwsh
         env:
-          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+          VCPKG_BINARY_SOURCES: 'clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite'
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT/vcpkg" install `
-            sdl2 ffmpeg[avcodec]:x64-windows vulkan-headers vulkan-loader --triplet x64-windows
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE/.vcpkg-cache" | Out-Null
+          $root = "$env:RUNNER_TEMP/cz-vcpkg"
+          git clone https://github.com/microsoft/vcpkg $root
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $root checkout b322364f06308bdd24823f9d8f03fe0cc86fd46f
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$root/bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$root/vcpkg.exe" install 'sdl2:x64-windows' 'ffmpeg[avcodec]:x64-windows' `
+            'vulkan-headers:x64-windows' 'vulkan-loader:x64-windows'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "VCPKG_INSTALLATION_ROOT=$root" >> $env:GITHUB_ENV
 
       - name: clone recompilers at pinned bases and apply local patches
         shell: bash

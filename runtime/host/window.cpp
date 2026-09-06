@@ -148,8 +148,13 @@ int Host_DisplayModeList(uint32_t*, int) { return 0; }
 // vulkan.h before SDL_vulkan.h so the latter uses the real handle types rather than
 // its own forward declarations — the surface below is a VkSurfaceKHR either way, but
 // VK_NULL_HANDLE only exists with the real header.
-#include <vulkan/vulkan.h>
+#include "../gpu/vulkan_api.h"
 #include <SDL_vulkan.h>
+#ifdef __ANDROID__
+#include <SDL_syswm.h>
+#include "../android/runtime_bridge.h"
+#include "../android/touch_state.h"
+#endif
 
 #include "../gpu/vk_renderer.h"
 #include "host_paths.h"
@@ -1267,6 +1272,9 @@ void Shutdown(const char* why)
     // _Exit, not exit: guest threads are still running recompiled code against guest
     // memory, and running static destructors underneath them would turn an ordinary
     // quit into a crash report about a subsystem that was working.
+#ifdef __ANDROID__
+    Android_MarkStopped();
+#endif
     std::_Exit(0);
 }
 
@@ -1288,6 +1296,12 @@ uint32_t g_progLastDraw = 0;
 
 bool Host_ProgressBegin(const char* title)
 {
+#ifdef __ANDROID__
+    // Android allows one SDL window. Native UI supplies progress; do not create
+    // a temporary GLES window before the Vulkan surface.
+    Android_Progress(title, 0.f);
+    return true;
+#endif
     if (getenv("CZ_NO_WINDOW"))
         return false;
     if (g_progWindow)
@@ -1318,6 +1332,10 @@ bool Host_ProgressBegin(const char* title)
 
 void Host_ProgressUpdate(const char* line, float fraction)
 {
+#ifdef __ANDROID__
+    Android_Progress(line, fraction);
+    return;
+#endif
     if (!g_progRenderer)
         return;
     // Pump so the compositor never marks the window unresponsive; drop every event —
@@ -1367,6 +1385,10 @@ void Host_ProgressUpdate(const char* line, float fraction)
 
 void Host_ProgressEnd()
 {
+#ifdef __ANDROID__
+    Android_Progress("Starting renderer", -1.f);
+    return;
+#endif
     if (g_progRenderer)
         SDL_DestroyRenderer(g_progRenderer);
     if (g_progWindow)
@@ -1973,6 +1995,9 @@ void Host_Present(uint32_t frontBuffer, uint32_t width, uint32_t height)
         }
     }
     g_swapSeq.fetch_add(1, std::memory_order_release);
+#ifdef __ANDROID__
+    Android_FramePresented();
+#endif
 }
 
 void Host_PresentPixels(const uint8_t* rgba, uint32_t width, uint32_t height)
@@ -2070,6 +2095,9 @@ std::vector<const char*> Host_VulkanInstanceExtensions()
     std::vector<const char*> out;
     if (!Host_VulkanSwapchainWanted())
         return out;
+#ifdef __ANDROID__
+    return { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME };
+#endif
     unsigned n = 0;
     if (!SDL_Vulkan_GetInstanceExtensions(g_window, &n, nullptr))
     {
@@ -2092,11 +2120,21 @@ bool Host_VulkanCreateSurface(void* instance, uint64_t* outSurface)
     if (!Host_VulkanSwapchainWanted() || !instance || !outSurface)
         return false;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
+#ifdef __ANDROID__
+    SDL_SysWMinfo info{};
+    SDL_VERSION(&info.version);
+    if (!SDL_GetWindowWMInfo(g_window, &info) || !info.info.android.window) return false;
+    VkAndroidSurfaceCreateInfoKHR ci{VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR};
+    ci.window = info.info.android.window;
+    if (vkCreateAndroidSurfaceKHR(static_cast<VkInstance>(instance), &ci, nullptr, &surface) != VK_SUCCESS)
+        return false;
+#else
     if (!SDL_Vulkan_CreateSurface(g_window, static_cast<VkInstance>(instance), &surface))
     {
         fprintf(stderr, "[host] SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError());
         return false;
     }
+    #endif
     *outSurface = reinterpret_cast<uint64_t>(surface);
     return true;
 }
@@ -2414,6 +2452,9 @@ void Host_WindowRun()
             biggerAxis(merged.thumbLY, kb.thumbLY);
             biggerAxis(merged.thumbRX, kb.thumbRX);
             biggerAxis(merged.thumbRY, kb.thumbRY);
+#ifdef __ANDROID__
+            AndroidTouch_Merge(merged);
+#endif
             PublishPad(0, merged);
             PublishPad(1, HostPadState{});
         }

@@ -18,6 +18,10 @@
 #include <map>
 #include <system_error>
 #include <vector>
+#include <array>
+#include <set>
+#include <algorithm>
+#include <cctype>
 
 namespace fs = std::filesystem;
 
@@ -76,7 +80,8 @@ bool SafeName(const std::string& name)
 {
     if (name.empty() || name == "." || name == "..")
         return false;
-    return name.find('/') == std::string::npos && name.find('\\') == std::string::npos;
+    return name.find('/') == std::string::npos && name.find('\\') == std::string::npos &&
+           name.find(':') == std::string::npos && name.find('\0') == std::string::npos;
 }
 
 struct Entry
@@ -112,7 +117,7 @@ public:
     // the end of the file is an error that says so, not a short read used as data.
     bool ReadAt(uint64_t off, void* dst, size_t n, std::string& err)
     {
-        if (off + n > size_)
+        if (off > size_ || n > size_ - off)
         {
             char buf[128];
             snprintf(buf, sizeof buf,
@@ -186,6 +191,12 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
             package.filename().string().c_str(), live ? "LIVE" : con ? "CON" : "PIRS",
             displayName.c_str(), titleId, contentType);
 
+    if (titleId != 0x58410A8D)
+    {
+        err = "this package is not Dead Rising 2: Case Zero (expected title ID 58410A8D)";
+        return false;
+    }
+
     if (volumeType == 1)
     {
         // SVOD is a different on-disk shape (sibling .data/ fragment files) that no
@@ -197,6 +208,12 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
     if (volumeType != 0)
     {
         err = "unknown volume type " + std::to_string(volumeType);
+        return false;
+    }
+
+    if (headerSize < sizeof hdr || headerSize > r.size())
+    {
+        err = "invalid STFS header size";
         return false;
     }
 
@@ -238,8 +255,15 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
     std::map<uint32_t, std::string> dirNames; // entry ordinal -> "path/"
     uint32_t ordinal = 0;
     uint64_t totalBytes = 0;
+    std::set<uint32_t> visitedTables;
+    std::set<std::string> outputNames;
     for (uint32_t t = 0; t < tableBlockCount; t++)
     {
+        if (!visitedTables.insert(tableBlockIndex).second)
+        {
+            err = "cyclic STFS directory block chain";
+            return false;
+        }
         uint8_t block[kBlockSize];
         if (!r.ReadAt(BlockIndexToOffset(baseOffset, tableBlockIndex), block, sizeof block, err))
             return false;
@@ -249,6 +273,11 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
             if (e[0] == 0)
                 break;
             const uint8_t eflags = e[40];
+            if ((eflags & 0x3F) > 40 || ordinal >= 50000)
+            {
+                err = "invalid STFS entry name length or too many entries";
+                return false;
+            }
             const std::string name(reinterpret_cast<const char*>(e), eflags & 0x3F);
             if (!SafeName(name))
             {
@@ -259,12 +288,37 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
             std::string base;
             if (auto it = dirNames.find(parent); it != dirNames.end())
                 base = it->second;
+            else if (parent != 0xFFFF)
+            {
+                err = "STFS entry has an invalid/non-directory parent";
+                return false;
+            }
+            std::string normalized = base + name;
+            std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                [](unsigned char c) { return char(std::tolower(c)); });
+            if (normalized.size() > 4096 || std::count(normalized.begin(), normalized.end(), '/') > 32 ||
+                !outputNames.insert(normalized).second)
+            {
+                err = "duplicate or excessively nested STFS path";
+                return false;
+            }
             if (eflags & 0x80)
                 dirNames[ordinal] = base + name + "/";
             else
             {
                 files.push_back({base + name, BeU32(e + 52), U24Le(e + 47), U24Le(e + 44)});
+                if (files.back().length > r.size() ||
+                    files.back().blockCount < (uint64_t(files.back().length) + kBlockSize - 1) / kBlockSize)
+                {
+                    err = "impossible STFS file length/block count";
+                    return false;
+                }
                 totalBytes += files.back().length;
+                if (totalBytes > (4ull << 30))
+                {
+                    err = "STFS extraction exceeds the 4 GiB Case Zero limit";
+                    return false;
+                }
             }
             ordinal++;
         }
@@ -285,26 +339,58 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
     fprintf(stderr, "[extract] %zu files, %" PRIu64 " MB -> %s\n", files.size(),
             totalBytes >> 20, outDir.string().c_str());
 
+    std::error_code ec;
+    fs::create_directories(outDir, ec);
+    const auto canonicalRoot = fs::weakly_canonical(outDir, ec);
+    if (ec) { err = "cannot create extraction directory"; return false; }
+    const auto space = fs::space(canonicalRoot, ec);
+    if (!ec && (space.available < totalBytes || space.available - totalBytes < (128ull << 20)))
+    {
+        err = "not enough free space to unpack the game (128 MB reserve required)";
+        return false;
+    }
     uint64_t written = 0;
     int lastPercent = -1;
-    std::vector<uint8_t> buf;
+    std::array<uint8_t, kBlockSize> buf{};
+    if (progress) progress(0, totalBytes);
     for (const auto& fe : files)
     {
-        buf.clear();
-        buf.reserve(fe.length);
+        const fs::path dest = outDir / fe.path;
+        fs::create_directories(dest.parent_path(), ec);
+        if (ec) { err = "cannot create " + dest.parent_path().string(); return false; }
+        const auto resolved = fs::weakly_canonical(dest, ec);
+        const auto relative = resolved.lexically_relative(canonicalRoot);
+        if (ec || relative.empty() || *relative.begin() == ".." || fs::is_symlink(dest, ec))
+        {
+            err = "refusing STFS destination outside output root or through a symlink";
+            return false;
+        }
+        std::ofstream out(dest, std::ios::binary | std::ios::trunc);
+        if (!out) { err = "cannot write " + dest.string(); return false; }
         uint32_t remaining = fe.length;
         uint32_t block = fe.startBlock;
+        std::set<uint32_t> visited;
         for (uint32_t k = 0; k < fe.blockCount && remaining && block != kEndOfChain; k++)
         {
-            const uint32_t n = remaining < kBlockSize ? remaining : kBlockSize;
-            const size_t at = buf.size();
-            buf.resize(at + n);
-            if (!r.ReadAt(BlockIndexToOffset(baseOffset, block), buf.data() + at, n, err))
+            if (!visited.insert(block).second)
+            {
+                err = fe.path + ": cyclic STFS file block chain";
+                return false;
+            }
+            const uint32_t n = std::min(remaining, kBlockSize);
+            if (!r.ReadAt(BlockIndexToOffset(baseOffset, block), buf.data(), n, err))
             {
                 err = fe.path + ": " + err;
                 return false;
             }
+            if (!out.write(reinterpret_cast<const char*>(buf.data()), n))
+            {
+                err = "cannot write " + dest.string();
+                return false;
+            }
             remaining -= n;
+            written += n;
+            if (progress && (k & 255u) == 0) progress(written, totalBytes);
             if (!nextBlock(block, &block, err))
             {
                 err = fe.path + ": " + err;
@@ -316,20 +402,9 @@ bool Extract(const fs::path& package, const fs::path& outDir, std::string& err,
             err = fe.path + ": block chain ended " + std::to_string(remaining) + " bytes short";
             return false;
         }
-
-        const fs::path dest = outDir / fe.path;
-        std::error_code ec;
-        fs::create_directories(dest.parent_path(), ec);
-        std::ofstream out(dest, std::ios::binary | std::ios::trunc);
-        if (!out || !out.write(reinterpret_cast<const char*>(buf.data()), std::streamsize(buf.size())))
-        {
-            err = "cannot write " + dest.string();
-            return false;
-        }
-
-        written += fe.length;
-        if (progress)
-            progress(written, totalBytes);
+        out.close();
+        if (!out) { err = "cannot finish writing " + dest.string(); return false; }
+        if (progress) progress(written, totalBytes);
         const int percent = totalBytes ? int(written * 100 / totalBytes) : 100;
         if (percent / 10 != lastPercent / 10)
         {

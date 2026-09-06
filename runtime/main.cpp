@@ -162,10 +162,19 @@ int RunSmoke()
 
 } // namespace
 
+#if defined(__ANDROID__)
+int CzRuntimeMain(int argc, char** argv)
+#else
 int main(int argc, char** argv)
+#endif
 {
     if (argc > 1 && strcmp(argv[1], "--smoke") == 0)
         return RunSmoke();
+#ifdef CZ_PPC_STUB_IMAGE
+    fprintf(stderr, "This is a diagnostic build with a STUB PPC image, not the game. "
+                    "Only --smoke is supported. See docs/android.md.\n");
+    return 2;
+#endif
 
     // Release D.2: the in-process cache builder. This is the same translation D.4's
     // first-sight path uses at [imload] time, run over a directory of microcode dumps —
@@ -572,6 +581,13 @@ int main(int argc, char** argv)
     // frames that nobody would ever look for. Nothing here touches guest memory, so
     // there is no risk in the other direction.
     const bool haveWindow = Host_WindowInit();
+#ifdef __ANDROID__
+    if (!haveWindow)
+    {
+        fprintf(stderr, "[android] SDL could not create the game surface; refusing a headless launch.\n");
+        return 1;
+    }
+#endif
 
     // Run the entry point as the main guest thread. Stack size is the XEX header's
     // own XEX_HEADER_DEFAULT_STACK_SIZE (0x40000 = 256 KB), which is also exactly

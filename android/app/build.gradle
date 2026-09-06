@@ -1,0 +1,88 @@
+plugins { id 'com.android.application' }
+
+def depsRoot = file(System.getenv('CZ_ANDROID_DEPS') ?: '../../thirdparty/android')
+def generatedRoot = file('../generated')
+android {
+    namespace 'com.casezero.launcher'
+    compileSdk 35
+    ndkVersion '27.2.12479018'
+    defaultConfig {
+        applicationId 'com.casezero.recomp'
+        minSdk 29
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0-experimental'
+        ndk { abiFilters 'arm64-v8a' }
+        buildConfigField 'String', 'RELEASES_API', '"https://api.github.com/repos/Player124413/Dead_Rising_2_Case_Zero_Xenon_Recomp/releases/latest"'
+    }
+    flavorDimensions += 'runtime'
+    productFlavors {
+        diagnostic {
+            dimension 'runtime'
+            applicationIdSuffix '.diagnostic'
+            versionNameSuffix '-diagnostic'
+            buildConfigField 'boolean', 'DIAGNOSTIC', 'true'
+            resValue 'string', 'app_name', 'Case Zero — Diagnostics'
+        }
+        game {
+            dimension 'runtime'
+            buildConfigField 'boolean', 'DIAGNOSTIC', 'false'
+            resValue 'string', 'app_name', 'Case Zero Recompiled'
+        }
+    }
+    signingConfigs {
+        release {
+            if (System.getenv('ANDROID_KEYSTORE_FILE')) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_FILE'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false // JNI entry points and SDL callbacks must retain their names.
+        }
+        debug { debuggable true }
+    }
+    sourceSets {
+        main.java.srcDirs += new File(depsRoot, 'sdl/android-project/app/src/main/java')
+        diagnostic.jniLibs.srcDirs = [new File(generatedRoot, 'diagnostic/jniLibs')]
+        diagnostic.assets.srcDirs += new File(generatedRoot, 'diagnostic/assets')
+        game.jniLibs.srcDirs = [new File(generatedRoot, 'game/jniLibs')]
+        game.assets.srcDirs += new File(generatedRoot, 'game/assets')
+    }
+    buildFeatures { buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    packaging {
+        // Required by adrenotools: hooks must exist in nativeLibraryDir.
+        jniLibs { useLegacyPackaging = true }
+    }
+    lint { abortOnError true; checkReleaseBuilds true }
+}
+
+// Fail before packaging instead of silently building an APK with no engine. Unit
+// tests/lint can run without game files; each APK requires its own prepared inputs.
+android.applicationVariants.all { variant ->
+    def mode = variant.flavorName
+    def checkInputs = tasks.register("verify${variant.name.capitalize()}NativeInputs") {
+        doLast {
+            def base = new File(generatedRoot, mode)
+            def info = new File(base, 'assets/build-info.json')
+            if (!info.isFile() || new groovy.json.JsonSlurper().parse(info).mode != mode)
+                throw new GradleException("Run tools/android/build.sh ${mode} first (no matching native build-info)")
+            ['main', 'cz_support', 'SDL2', 'c++_shared', 'avcodec', 'avutil', 'dxcompiler',
+             'main_hook', 'hook_impl', 'file_redirect_hook', 'gsl_alloc_hook'].each { lib ->
+                if (!new File(base, "jniLibs/arm64-v8a/lib${lib}.so").isFile())
+                    throw new GradleException("Missing Android ARM64 lib${lib}.so; run tools/android/build.sh ${mode}")
+            }
+        }
+    }
+    variant.mergeAssetsProvider.configure { dependsOn(checkInputs) }
+}
+dependencies { testImplementation 'junit:junit:4.13.2' }

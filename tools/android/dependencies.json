@@ -1,0 +1,11 @@
+{
+  "ndk": "27.2.12479018",
+  "api": 29,
+  "sdl": {"url": "https://github.com/libsdl-org/SDL.git", "commit": "98d1f3a45aae568ccd6ed5fec179330f47d4d356"},
+  "xenon": {"url": "https://github.com/hedge-dev/XenonRecomp.git", "commit": "ddd128bcca99fe8bfbb99bea583c972351fa6ace", "patch": "tools/ci/xenonrecomp-local.patch"},
+  "xenos": {"url": "https://github.com/hedge-dev/XenosRecomp.git", "commit": "990d03b28a27b50277ee5d8d942e1c5f873869d1", "patch": "tools/ci/xenosrecomp-local.patch", "submodules": ["thirdparty/dxc-bin"]},
+  "ffmpeg": {"url": "https://github.com/FFmpeg/FFmpeg.git", "commit": "db69d06eeeab4f46da15030a80d539efb4503ca8"},
+  "volk": {"url": "https://github.com/zeux/volk.git", "commit": "59d26900f53c7621a8ba8ab0e3f18d3bd883fa9a"},
+  "adrenotools": {"url": "https://github.com/bylaws/libadrenotools.git", "commit": "8fae8ce254dfc1344527e05301e43f37dea2df80"},
+  "dxc": {"url": "https://github.com/microsoft/DirectXShaderCompiler.git", "commit": "b106a961d09221b3c5bdb37be45b679257da08b8"}
+}

@@ -18,6 +18,17 @@ keyboard/mouse support.
 Dead Rising 2: Case Zero and supply your own copy of the game package. This
 project is not affiliated with, or endorsed by, Capcom or Microsoft.
 
+## Android (experimental port work)
+
+An ARM64 Android runtime and a new English/Russian launcher are being added on
+this branch, using UnleashedRecomp-Android as a feature reference **without mods
+or copied GPL code**. See [Android setup, scope and device-test gates](docs/android.md).
+
+**The PC completion status above does not apply to Android.** Android gameplay
+has not been device-verified. Public CI builds a clearly labelled **diagnostics
+APK with stub guest code**, not a playable game; a game APK requires your own
+real recompiled PPC input and validation on a compatible device.
+
 ## How to install
 
 1. **Download** the release for your system from the

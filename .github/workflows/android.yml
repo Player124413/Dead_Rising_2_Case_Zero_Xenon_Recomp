@@ -1,0 +1,91 @@
+# Public CI contains no XEX or game-derived C++. Its APK is visibly DIAGNOSTIC,
+# uses a separate applicationId and cannot boot the game. A green job proves
+# compilation/packaging, not phone gameplay. Real local builds: docs/android.md.
+name: Android APK (diagnostic)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    name: ARM64 native + launcher + APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      NDK_VERSION: '27.2.12479018'
+      CZ_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.6'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install host tools and locked Android SDK
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang lld
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' "ndk;$NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Restore locked native dependencies
+        id: deps
+        uses: actions/cache/restore@v4
+        with:
+          path: thirdparty/android
+          key: android-ndk27-${{ hashFiles('tools/android/dependencies.json', 'tools/android/bootstrap.py', 'tools/android/build_ffmpeg.sh', 'tools/android/build_dxc.sh', 'tools/ci/*.patch') }}
+      - name: Fetch locked sources (no game inputs)
+        id: bootstrap
+        run: python3 tools/android/bootstrap.py --dxc
+      - name: Build real Android host runtime against stub guest code
+        shell: bash
+        run: |
+          set -o pipefail
+          tools/android/build.sh diagnostic 2>&1 | tee android-native.log
+      - name: Save native dependency build cache
+        if: always() && steps.bootstrap.outcome == 'success' && steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: thirdparty/android
+          key: ${{ steps.deps.outputs.cache-primary-key }}
+      - name: Unit tests, Android lint and diagnostic APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace testDiagnosticDebugUnitTest lintDiagnosticDebug assembleDiagnosticDebug 2>&1 | tee ../android-gradle.log
+      - name: Verify APK contents, ARM64 ABI, 16 KB ELF alignment and Android signature
+        shell: bash
+        run: |
+          apk=android/app/build/outputs/apk/diagnostic/debug/app-diagnostic-debug.apk
+          python3 tools/android/verify_apk.py "$apk" --mode diagnostic
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+      - name: Publish diagnostic APK (NOT a playable game)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaseZero-Android-DIAGNOSTIC-arm64-v8a
+          path: android/app/build/outputs/apk/diagnostic/debug/*.apk
+          if-no-files-found: error
+      - name: Publish build and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-build-logs
+          if-no-files-found: ignore
+          path: |
+            android-native.log
+            android-gradle.log
+            android/app/build/reports/
+            android/app/build/test-results/
+            build/android-diagnostic/CMakeFiles/CMakeConfigureLog.yaml
+            thirdparty/android/dxc-build/CMakeFiles/CMakeError.log
+            thirdparty/android/dxc-build/CMakeFiles/CMakeConfigureLog.yaml

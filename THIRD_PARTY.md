@@ -83,3 +83,30 @@ stand as written and must be revisited BEFORE the first line is copied.
    upstream in those repos under MIT, not vendored here under GPLv3.
 4. **Facts are free; expression is not.** Porting a *method* from a sibling port's
    docs needs no licence step. Copying its `.cpp` does.
+
+## Android additions (2026-09-06)
+
+The Android launcher is new code under this repository's license.
+[SansNope/UnleashedRecomp-Android](https://github.com/SansNope/UnleashedRecomp-Android)
+(GPL-3.0) is a **UX/feature reference only**; its Java/C++, art and bundled driver
+binaries are not copied. Mod loaders, fan-localization overrides and mod UIs are
+not included.
+
+External sources are pinned in `tools/android/dependencies.json`, fetched into
+an ignored directory, and built from source. Their own notices accompany APKs:
+
+| component | license | Android use |
+|---|---|---|
+| SDL 2.32.8 | zlib | Matching Java activity/controller/audio classes and shared native library, unmodified |
+| FFmpeg 7.1.1 | LGPL-2.1-or-later | Shared libavcodec/libavutil, XMA1/XMA2 only; GPL, version3 and nonfree disabled |
+| volk | MIT | Vulkan dispatch for the selected system/custom loader |
+| libadrenotools + liblinkernsbypass | BSD-2-Clause | Optional user-supplied Qualcomm driver loading; no driver binary bundled |
+| DirectXShaderCompiler v1.8.2505.1 | LLVM/NCSA and included third-party notices | On-device HLSL to SPIR-V; source-built Android library |
+| Gradle wrapper | Apache-2.0 | Unmodified wrapper scripts/JAR from Gradle v8.9.0, SHA-256-verified distribution |
+
+XenonRecomp's transitive dependencies (fmt, xxHash, tiny-AES-c, SIMDe,
+libmspack, and its disassembler) retain their upstream notices. A production
+redistribution must supply corresponding LGPL source/relink materials as
+applicable, not just a link to this README. The diagnostic build is reproducible
+entirely from public sources and contains no copyrighted game input. Preserve
+all upstream notices when distributing locally built game APKs.

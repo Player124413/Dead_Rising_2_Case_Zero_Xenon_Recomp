@@ -46,3 +46,17 @@ tools/__pycache__/
 /thirdparty/ffmpeg-lgpl/
 build-release/
 build-relmatch/
+
+# Android SDK/Gradle/dependency and generated packaging trees. Never game inputs.
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/app/.cxx/
+/android/app/src/main/jniLibs/
+/android/generated/
+/thirdparty/android/
+*.apk
+*.aab
+*.jks
+*.keystore
+__pycache__/

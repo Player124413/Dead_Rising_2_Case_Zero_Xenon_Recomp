@@ -13,7 +13,12 @@
 #include "../host/window.h"
 #include "../cpu/thread_budget.h"
 
-#include <vulkan/vulkan.h>
+#include "vulkan_api.h"
+#include "vulkan_requirements.h"
+#include "bcn_decode.h"
+#ifdef __ANDROID__
+#include "../android/runtime_bridge.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -176,6 +181,7 @@ constexpr uint32_t kPsConstBytes = 256 * 16;
 // Sized from the DEVICE rather than from a new magic number, clamped to something
 // sane, because "how many sampled images may a shader see" is a property of the host
 // and not something to guess twice.
+bool g_nativeBc = true;
 uint32_t g_maxDescriptors = 4096;   // replaced at init from the device's own limit
 
 // --- diagnostics --------------------------------------------------------------------
@@ -6355,6 +6361,9 @@ bool CreateDevice()
         ir = vkCreateInstance(&ici, nullptr, &R->instance);
     }
     VK_CHECK(ir, "vkCreateInstance");
+#ifdef __ANDROID__
+    volkLoadInstance(R->instance);
+#endif
 
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(R->instance, &count, nullptr);
@@ -6384,6 +6393,12 @@ bool CreateDevice()
     fprintf(stderr, "[vk] device: %s (Vulkan %u.%u.%u)\n", props.deviceName,
             VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion),
             VK_VERSION_PATCH(props.apiVersion));
+    const std::string missing = CzVulkanMissingFeatures(R->physical);
+    if (!missing.empty())
+    {
+        fprintf(stderr, "[vk] unsupported GPU/driver, missing: %s\n", missing.c_str());
+        return false;
+    }
     vkGetPhysicalDeviceMemoryProperties(R->physical, &R->memProps);
     // THE TIMESTAMP PERIOD, and the two ways a device can decline to answer. A queue whose
     // `timestampValidBits` is 0 cannot write them at all, and a period of 0 would silently
@@ -6441,9 +6456,7 @@ bool CreateDevice()
     // LRU this still needs. CZ_VK_MAX_TEXTURES overrides it — including DOWNWARD, which
     // is the same-binary arm that reproduces the exhaustion on demand.
     {
-        const uint32_t deviceCap =
-            std::min(props.limits.maxPerStageDescriptorSampledImages,
-                     props.limits.maxDescriptorSetSampledImages / 4);
+        const uint32_t deviceCap = CzVulkanDescriptorCapacity(R->physical);
         uint32_t want = std::min(deviceCap, 65536u);
         if (const char* env = getenv("CZ_VK_MAX_TEXTURES"))
             want = std::min(deviceCap, uint32_t(std::max(16, atoi(env))));
@@ -6572,9 +6585,13 @@ bool CreateDevice()
     f2.pNext = &v13;
     f2.features.shaderInt64 = VK_TRUE;
     f2.features.independentBlend = VK_TRUE;
-    f2.features.fillModeNonSolid = VK_TRUE;
-    f2.features.depthClamp = VK_TRUE;
-    f2.features.textureCompressionBC = VK_TRUE;
+    // All pipelines use FILL with depth clamp disabled. Do not request unused
+    // optional desktop features on mobile drivers.
+    VkPhysicalDeviceFeatures textureFeatures{};
+    vkGetPhysicalDeviceFeatures(R->physical, &textureFeatures);
+    g_nativeBc = textureFeatures.textureCompressionBC && !EnvOn("CZ_VK_FORCE_BC_DECODE");
+    f2.features.textureCompressionBC = g_nativeBc ? VK_TRUE : VK_FALSE;
+    fprintf(stderr, "[vk] BC textures: %s\n", g_nativeBc ? "native" : "CPU RGBA decode (more RAM)");
     // ANISOTROPIC FILTERING (part 41 item 1). Xenos filters up to 16:1 and the fetch
     // constants carry a per-texture aniso field; until part 41 both samplers were
     // plain trilinear, so every grazing-angle surface — the whole road at distance —
@@ -6664,6 +6681,10 @@ bool CreateDevice()
     dci.enabledExtensionCount = uint32_t(devExts.size());
     dci.ppEnabledExtensionNames = devExts.empty() ? nullptr : devExts.data();
     VK_CHECK(vkCreateDevice(R->physical, &dci, nullptr, &R->device), "vkCreateDevice");
+#ifdef __ANDROID__
+    volkLoadDevice(R->device);
+    Android_MarkPlaying();
+#endif
     vkGetDeviceQueue(R->device, R->queueFamily, 0, &R->queue);
     // PART 81 §1.1 — resolve the device command table before anything can record. Fatal
     // on any null; prints which arm it is.
@@ -7178,7 +7199,13 @@ void PrewarmPipelines()
         // sight, so keys referencing an untranslated shader are skipped and counted —
         // the seed's coverage completes by the second launch, and the log's
         // missing-shader count below says exactly how partial it was.
-        const std::string shipped = (HostPaths::ExeDir() / "prewarm.keys").string();
+        const std::string shipped = (
+#ifdef __ANDROID__
+            HostPaths::Root() / "tools" / "release" /
+#else
+            HostPaths::ExeDir() /
+#endif
+            "prewarm.keys").string();
         f = fopen(shipped.c_str(), "rb");
         if (f)
         {
@@ -10153,6 +10180,47 @@ uint32_t UploadTexture(uint8_t* base, const uint32_t* regs, uint32_t constIdx,
         }
     }
 
+    // Decode AFTER untile/endian conversion, golden recovery and debug tints,
+    // but BEFORE both upload paths. Source guards still hash guest BC bytes.
+    // Each copy has its own offset and may contain all six cube faces.
+    VkFormat uploadFormat = format;
+    if (!g_nativeBc && blockDim == 4)
+    {
+        Bcn::Format bc;
+        switch (format)
+        {
+        case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: bc = Bcn::Format::BC1; break;
+        case VK_FORMAT_BC2_UNORM_BLOCK: bc = Bcn::Format::BC2; break;
+        case VK_FORMAT_BC3_UNORM_BLOCK: bc = Bcn::Format::BC3; break;
+        case VK_FORMAT_BC4_UNORM_BLOCK: bc = Bcn::Format::BC4; break;
+        case VK_FORMAT_BC5_UNORM_BLOCK: bc = Bcn::Format::BC5; break;
+        default: Count("texture: unsupported CPU BC format"); return 0;
+        }
+        std::vector<uint8_t> decoded, face;
+        for (auto& copy : copies)
+        {
+            const uint32_t w = copy.imageExtent.width, h = copy.imageExtent.height;
+            const size_t faceSize = size_t((w + 3) / 4) * ((h + 3) / 4) * bytesPerUnit;
+            const size_t start = size_t(copy.bufferOffset);
+            const size_t faces = size_t(copy.imageSubresource.layerCount) * copy.imageExtent.depth;
+            if (start > pixels.size() || faceSize * faces > pixels.size() - start ||
+                size_t(w) * h * 4 * faces > StagingUsableBytes() - std::min<size_t>(decoded.size(), StagingUsableBytes()))
+            {
+                Count("texture: BC decode exceeds source/staging bounds"); return 0;
+            }
+            copy.bufferOffset = decoded.size();
+            for (size_t layer = 0; layer < faces; ++layer)
+            {
+                if (!Bcn::Decode(bc, pixels.data() + start + faceSize * layer,
+                                 faceSize, w, h, face)) return 0;
+                decoded.insert(decoded.end(), face.begin(), face.end());
+            }
+        }
+        pixels.swap(decoded);
+        uploadFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        Count("texture: BC decoded on CPU");
+    }
+
     // The refresh arm: same image, same slot, new pixels. No allocation, so it can run
     // every fetch without exhausting the bindless heap.
     if (refresh && cached)
@@ -10334,7 +10402,7 @@ uint32_t UploadTexture(uint8_t* base, const uint32_t* regs, uint32_t constIdx,
     // POOLED (part 77): the last argument. A guest texture's image is never destroyed
     // while the process runs — see the ImgBlock comment — and one `vkAllocateMemory` per
     // texture was 350.6 ms of this route's 496.1 ms decode.
-    if (!CreateImage(entry.image, t.width, t.height, format,
+    if (!CreateImage(entry.image, t.width, t.height, uploadFormat,
                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      isCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D, layers, 1,
@@ -26108,6 +26176,9 @@ bool VkRenderer_Init()
 
 void VkRenderer_Draw(uint8_t* base, const Pm4Draw& draw)
 {
+#ifdef __ANDROID__
+    Android_WaitForeground();
+#endif
     if (!g_active || g_d3dMode)
         return;
     // The renderer's own count of draws it was HANDED, next to the per-primitive
@@ -29006,6 +29077,9 @@ void ApplyPendingRenderScale()
 void VkRenderer_OnSwap(uint8_t* base, uint32_t frontBuffer, uint32_t width,
                        uint32_t height)
 {
+#ifdef __ANDROID__
+    Android_WaitForeground();
+#endif
     if (!g_active || g_d3dMode)
         return;
     // NOTE (part 91): the pending internal-resolution change is applied at the TOP of
@@ -29043,6 +29117,9 @@ bool VkRenderer_D3DInit()
 void VkRenderer_D3DDraw(uint8_t* base, const Pm4Draw& draw, const uint32_t* regs,
                         const Pm4ShaderBinding& vs, const Pm4ShaderBinding& ps)
 {
+#ifdef __ANDROID__
+    Android_WaitForeground();
+#endif
     if (!g_active || !g_d3dMode)
         return;
     // The same resolve discriminator as the PM4 feed, over the PRIVATE register
@@ -29057,6 +29134,9 @@ void VkRenderer_D3DDraw(uint8_t* base, const Pm4Draw& draw, const uint32_t* regs
 
 void VkRenderer_D3DSwap(uint8_t* base)
 {
+#ifdef __ANDROID__
+    Android_WaitForeground();
+#endif
     if (!g_active || !g_d3dMode)
         return;
     // The front buffer is the destination of the resolve the title just performed

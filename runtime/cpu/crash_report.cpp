@@ -476,6 +476,9 @@ void Handler(int sig, siginfo_t* info, void* ucontext)
 #if defined(__x86_64__)
     if (ucontext)
         pc = (unsigned long long)((const ucontext_t*)ucontext)->uc_mcontext.gregs[REG_RIP];
+#elif defined(__aarch64__) && defined(__linux__)
+    if (ucontext)
+        pc = (unsigned long long)((const ucontext_t*)ucontext)->uc_mcontext.pc;
 #endif
     Report(sig, info ? info->si_addr : nullptr, pc);
 }

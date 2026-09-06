@@ -13,6 +13,9 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+#if defined(__ANDROID__)
+#include <android/sharedmem.h>
+#endif
 #endif
 
 Memory g_memory;
@@ -169,8 +172,16 @@ void Memory::Init()
 
     // Back all three views with one shared memfd, so a write through any view is
     // visible through the others.
+    #if defined(__ANDROID__)
+    // NDK's public API handles both ashmem and memfd and works with SELinux.
+    // One FD backs all views; never substitute three anonymous mappings.
+    const int fd = ASharedMemory_create("xbox_physical", kPhysSize);
+    const bool backingOk = fd >= 0;
+#else
     const int fd = memfd_create("xbox_physical", MFD_CLOEXEC);
-    if (fd < 0 || ftruncate(fd, off_t(kPhysSize)) != 0)
+    const bool backingOk = fd >= 0 && ftruncate(fd, off_t(kPhysSize)) == 0;
+#endif
+    if (!backingOk)
     {
         perror("runtime: memfd for physical memory");
         abort();

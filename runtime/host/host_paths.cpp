@@ -57,6 +57,11 @@ std::filesystem::path QueryExePath()
         }
         buf.resize(buf.size() * 2); // truncated; ERROR_INSUFFICIENT_BUFFER
     }
+#elif defined(__ANDROID__)
+    // /proc/self/exe is app_process64, NOT the APK's native-library directory.
+    if (const char* lib = std::getenv("CZ_ANDROID_LIBRARY_DIR"); lib && *lib)
+        return std::filesystem::path(lib) / "libmain.so";
+    return {};
 #elif defined(__APPLE__)
     // _NSGetExecutablePath returns the path as INVOKED, which may contain symlinks or
     // `..`; weakly_canonical resolves it the same way readlink already does on Linux.
@@ -179,6 +184,11 @@ std::filesystem::path SavedGames()
     else
         base = ExeDir(); // no user profile at all: stay beside the exe, loudly odd
     return base / kGameFolder;
+#elif defined(__ANDROID__)
+    // Set before the first HostPaths query by SDL_main. Never write next to app_process.
+    if (const char* dir = std::getenv("CZ_SAVE_DIR"); dir && *dir)
+        return dir;
+    return Root() / "saves";
 #elif defined(__APPLE__)
     const char* home = std::getenv("HOME");
     return std::filesystem::path(home ? home : ".") / "Library" /

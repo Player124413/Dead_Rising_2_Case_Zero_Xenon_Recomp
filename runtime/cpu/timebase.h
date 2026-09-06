@@ -35,6 +35,12 @@
 // only ever rewrites call sites.
 #if defined(__x86_64__) || defined(_M_X64)
 #include <x86intrin.h>
+#elif defined(__aarch64__)
+// XenonUtils declares its ARM __rdtsc fallback in ppc_context.h. Parse it
+// before shadowing the call, just as x86intrin.h is parsed above on x86.
+// Otherwise the macro rewrites the function declaration itself.
+#include "ppc_config.h"
+#include "ppc_context.h"
 #endif
 
 #include <cstdint>
