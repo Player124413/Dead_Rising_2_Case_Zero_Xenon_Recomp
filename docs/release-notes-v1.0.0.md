@@ -2,7 +2,8 @@
 
 This is the text to paste into the GitHub Release body when the operator creates
 it. The SHA-256 lines are current as of the post-§3-fix rebuild (2026-09-05, commit
-`46fab38` binaries — the MASH-on-pad string-follow fix + the always-on mouse camera); **if either artifact is rebuilt after the §3 operator
+`407eb79` binaries — string-follow, always-on mouse, and the Case West imports:
+XMA hardware loops, LRU texture-slot recycling, the Q glyph for in-game Y); **if either artifact is rebuilt after the §3 operator
 sitting, refresh its hash here first** (`sha256sum dist/*.tar.zst` /
 `Get-FileHash` on czwin).
 
@@ -71,6 +72,6 @@ XenosRecomp.
 ### Checksums (SHA-256)
 
 ```
-efbd5cb99629417816ae80a7ce5a75bfae979c1db995fecbebf153d0f6ff33ae  CaseZeroRecomp-linux-x86_64.tar.zst
-c1c1eb130a10c9134af5b55ed863d3acc78f0fdc073840a9bf7dc45f5700f311  CaseZeroRecomp-windows-x86_64.zip
+5bd1a50729fa460b0b3d409313a32c1ee07e2c51e0a93b2fc2898d6055b17ea3  CaseZeroRecomp-linux-x86_64.tar.zst
+6a3c03ba314263496355835f1f4bbbf97b4c5b654f3c04e611eccec1c633b170  CaseZeroRecomp-windows-x86_64.zip
 ```

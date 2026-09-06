@@ -276,3 +276,19 @@ mouse_cam= line in an existing cz_settings.txt is an ignored unknown.
 Both artifacts rebuilt at 46fab38 and re-gated (text identity + container
 GATE PASSED; czwin staged --smoke OK). SHAs refreshed: linux efbd5cb9…,
 windows c1c1eb13….
+
+**Addendum 3 (same day): the Case West back-imports.** Operator: *"Case west
+fixed some stuff grab what fix stuff in case zero too."* Their part 8 fixed
+three transferable things on top of its import of our stack, all taken:
+XMA hardware loops (their 7811618 — and Case Zero HITS the path: ~5,900
+loop sustains on one boot-to-gameplay run, first ctx at loopCount=254, the
+exact signature of their repeating laser cue; CZ_XMA_NO_LOOP=1 the arm),
+LRU texture-slot recycling (their c24176f, the white-textures-after-65536
++ fps-decay fix; validated here at cap 256 under sync validation — 215
+recycles, 215 paired deferred destroys, 0 hazards; 0 recycles at the
+default cap; CZ_VK_NO_TEX_LRU=1 the arm), and the Q legend for
+y_button_ig (their 112d47a — our map binds the in-game Y actions to KEY_Q;
+26 glyphs now, kGeneratorVersion 2, identity gate re-ran clean). NOT taken:
+their epilogue photo-camera bindings and generator table addresses (Case
+West-only), and everything that was already ours. Both artifacts rebuilt at
+407eb79 and re-gated. SHAs: linux 5bd1a507…, windows 6a3c03ba….
