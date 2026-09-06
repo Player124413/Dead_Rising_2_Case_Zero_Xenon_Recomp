@@ -1,74 +1,102 @@
-# Dead Rising 2: Case Zero — Native PC Port (Xenon Recompilation)
+# Dead Rising 2: Case Zero — Native PC Port
 
-A native Windows and Linux port of the Xbox 360 XBLA title **Dead Rising 2:
-Case Zero** (Capcom / Blue Castle Games, 2010), produced by statically
-recompiling the game's PowerPC executable to C++ with
-[XenonRecomp](https://github.com/hedge-dev/XenonRecomp) and translating its
-Xenos shaders with [XenosRecomp](https://github.com/hedge-dev/XenosRecomp),
-running against a purpose-built host runtime (Vulkan renderer, XAudio-style
-mixer with real XMA decoding, SDL window/input). **The game is completable
-start to finish** — it has been played through on both platforms.
+Play **Dead Rising 2: Case Zero** (Capcom / Blue Castle Games, 2010 — the Xbox
+360 exclusive prologue to Dead Rising 2) natively on your Windows or Linux PC.
 
-**No game data is included in this repository or in the release downloads.**
-You must own Dead Rising 2: Case Zero and supply your own copy of the XBLA
-package. This project is not affiliated with, or endorsed by, Capcom or
-Microsoft.
+This is not an emulator: the game's Xbox 360 code was translated ahead of time
+into a native program ([XenonRecomp](https://github.com/hedge-dev/XenonRecomp) /
+[XenosRecomp](https://github.com/hedge-dev/XenosRecomp)), running on a
+purpose-built engine with a Vulkan renderer, real XMA audio, and native
+keyboard/mouse support.
 
-## Player quickstart
+> **Status: essentially complete.** The game is **100% playable start to
+> finish** — it has been completed end to end on both Windows and Linux — and
+> should look right in nearly all places. A few minor issues remain (listed
+> below); none block progress.
 
-1. Download the release for your platform and unpack it anywhere:
-   - `CaseZeroRecomp-windows-x86_64.zip`
-   - `CaseZeroRecomp-linux-x86_64.tar.zst`
-2. Put your own copy of the XBLA package into `assets/package/`.
-   It is the file your Xbox 360 downloaded, normally at
-   `Content/0000000000000000/58410A8D/000D0000/<long hash, no extension>`,
-   about 825 MB. Copying the whole `58410A8D` folder in also works — the
-   runtime looks recursively.
-3. Run `cz_runtime` (`cz_runtime.exe` on Windows). The first run does
-   everything itself under a progress window: unpacks the package, builds the
-   shader cache from the disc's own shader banks, and generates the patched
-   menu/prompt assets from your data. Later runs start straight into the game.
+**No game data is included** in this repository or the downloads. You must own
+Dead Rising 2: Case Zero and supply your own copy of the game package. This
+project is not affiliated with, or endorsed by, Capcom or Microsoft.
 
-If anything required is missing, the game refuses to start with a message
-naming exactly what and where — it never half-starts.
+## How to install
+
+1. **Download** the release for your system from the
+   [Releases](../../releases) page:
+   - Windows: `CaseZeroRecomp-windows-x86_64.zip`
+   - Linux: `CaseZeroRecomp-linux-x86_64.tar.zst`
+2. **Unpack it anywhere** (Windows: right-click → Extract All; Linux:
+   `tar --zstd -xf CaseZeroRecomp-linux-x86_64.tar.zst`).
+3. **Add your copy of the game.** You need the XBLA package file your Xbox 360
+   downloaded — about **825 MB**, no file extension. On the console's storage
+   it is at:
+   ```
+   Content/0000000000000000/58410A8D/000D0000/<a long string of letters and numbers>
+   ```
+   Copy that file into the `assets/package/` folder inside the game folder you
+   just unpacked (copying the whole `58410A8D` folder in also works — or just
+   drag the file onto the launcher window in step 4).
+4. **Run the game** — `cz_runtime.exe` on Windows, `./cz_runtime` on Linux.
+   The first run sets everything up by itself under a progress bar: it unpacks
+   your package, prepares the game's 1,265 shaders (~10 seconds), and generates
+   the menu and prompt assets from your data. Later launches go straight into
+   the game.
+
+If anything needed is missing, the game tells you exactly what and where — it
+never fails with a blank screen on purpose. A `README.md` inside the bundle has
+a troubleshooting section.
+
+Your **saves and settings live outside the game folder** (Windows:
+`Saved Games\Dead Rising 2 Case Zero\`; Linux:
+`~/.local/share/Dead Rising 2 Case Zero/`), so you can delete or replace the
+game folder at any time without losing progress.
+
+## Controls
+
+- **Keyboard/mouse** works out of the box with the Dead Rising 2 PC control
+  scheme: WASD to move, mouse to look, left-click attack, right-click aim,
+  Space jump, E to use/pick up, Tab for the map, 1/3 to cycle items, arrow
+  keys for the d-pad. Every on-screen prompt shows real key icons, and the exact map
+  is printed in the terminal at startup. Rebindable via a `kbmap.txt` file next
+  to the executable.
+- **Any controller SDL recognizes** (Xbox layout) works, and the prompts switch
+  between keyboard and controller art automatically depending on which one you
+  touched last.
 
 ## Features
 
-- **The whole game**, playable start to finish: Still Creek, combo weapons,
-  cinematics, save/load, the works.
-- **60 fps** (the title's own hidden mode, surfaced) — with the shipped 30 fps
-  pacing available as a setting.
-- **Keyboard/mouse** with native key-cap prompt icons (our own art), DR2-PC
-  default bindings, raw mouse camera, and live prompt switching when you swap
-  between keyboard and pad. Player-editable `kbmap.txt` beside the executable.
-- **Gamepad** via SDL — anything SDL recognizes.
-- **The resurrected PC options screen**: the 360 build ships a dormant PC
-  graphics menu; this port revives it in-game for resolution, display mode,
-  vsync and shadow quality — resolution applies live, no restart.
-- **Internal resolution scaling** (720p up to 5K), **MSAA 2x** by default,
-  FOV adjustment, a settings launcher, and a pipeline pre-warm seed so even
-  the first session plays smoothly.
-- **Real XMA audio** through ffmpeg — music, speech and effects.
+- The **whole game**: Still Creek, combo weapons, cinematics, save/load —
+  completable start to finish.
+- **60 fps** (the game's own hidden mode, surfaced) — the original 30 fps
+  pacing remains available as a setting, along with higher caps.
+- **The restored PC options screen**: the Xbox build ships a dormant PC
+  graphics menu; this port revives it in-game — resolution (720p up to 5K,
+  applies live without a restart), display mode, vsync, shadow quality.
+- **MSAA 2x anti-aliasing** by default, adjustable field of view, a settings
+  launcher, and a pipeline pre-warm so even your first session plays smoothly.
+- **Real Xbox 360 audio** (XMA) through ffmpeg — music, speech, effects,
+  looping ambience.
+- **Built for long sessions**: texture memory recycles over a full
+  playthrough — no slow degradation on marathon runs.
 
 ## Requirements
 
-- A GPU + driver with **Vulkan 1.3** (dynamic rendering is required).
+- A GPU and driver with **Vulkan 1.3** support.
 - **Windows**: Windows 10 or later, x86-64.
-- **Linux**: x86-64 with glibc **2.43 or newer** (see known limitations).
-- ~2 GB of free disk space after first-run unpacking.
-- Your own copy of the game (see above).
+- **Linux**: x86-64 with glibc **2.43 or newer** (see known issues).
+- **~2 GB free disk space** after first-run unpacking.
+- **Your own copy of the game** (see above).
 
-## Known limitations
+## Known issues (minor — none affect playability)
 
-- **Linux glibc floor**: the artifact is built on a current distribution and
-  refuses to start on older ones with a `GLIBC_x.yz not found` message. An
-  AppImage/old-base build is planned.
-- **No macOS build yet** (nothing in principle blocks it — the recompiled
-  code is portable and an ARM64 path exists — it is hardware for testing that
-  is missing).
-- A subtle **hair-shading flicker** on Chuck in motion is a known open issue
-  (`docs/hair-flicker-part92.md`); real hardware does not show it.
-- The runtime expects the **full game package** and you must own the game.
+- A subtle **shading flicker on Chuck's hair** in motion
+  (`docs/hair-flicker-part92.md` tracks it).
+- The occasional spot may shade slightly differently than original hardware;
+  everything is being tracked and refined.
+- **Linux glibc floor**: distributions older than the build base (glibc 2.43)
+  refuse to start with a `GLIBC_x.yz not found` message. An AppImage-style
+  build is planned.
+- **No macOS build yet** — nothing blocks it in principle; it awaits test
+  hardware.
 
 ## Building from source
 
@@ -88,14 +116,14 @@ cmake --build runtime/build -j$(nproc)
 CI (`.github/workflows/build.yml`) builds the host runtime on both platforms
 on every push — it proves the host code compiles; it cannot run the game.
 
-## For other porters
+## For developers and other porters
 
-`docs/` is this project's full memory, written for an outside reader porting
-a *different* Xbox 360 title with the same pipeline: the findings ledger, the
-500-entry gotcha list, the `.big`/STFS/XEX format notes, the renderer and
-audio build-out records, and the measurement discipline that kept it honest.
-Start with `docs/xenia-capture-analysis.md` and `docs/gotchas.md`. The day-1
-README this file replaced is preserved at `docs/dev-readme-day1.md`.
+`docs/` is this project's full working memory, written for an outside reader
+porting a *different* Xbox 360 title with the same pipeline: the findings
+ledger, the 500-entry gotcha list, the `.big`/STFS/XEX format notes, the
+renderer and audio build-out records, and the measurement discipline that kept
+it honest. Start with `docs/xenia-capture-analysis.md` and `docs/gotchas.md`.
+The original day-1 dev README is preserved at `docs/dev-readme-day1.md`.
 
 ## Credits and licensing
 
