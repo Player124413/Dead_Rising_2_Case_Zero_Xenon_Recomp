@@ -43,6 +43,7 @@ add_subdirectory("${CZ_ANDROID_DEPS}/sdl" "sdl")
 # Build only the XEX loader with the TARGET compiler, not XenonRecomp's host tools.
 set(THIRDPARTY_ROOT "${XENON_ROOT}/thirdparty")
 add_subdirectory("${THIRDPARTY_ROOT}/fmt" "xenon-fmt")
+set(XXHASH_BUILD_XXHSUM OFF CACHE BOOL "" FORCE) # library only, no unused GPL command-line tool
 add_subdirectory("${THIRDPARTY_ROOT}/xxHash/cmake_unofficial" "xenon-xxhash")
 # Only the loader is needed. Do not compile/link Xenon's binutils-derived GPL
 # disassembler, or statically absorb LGPL libmspack into the game library.

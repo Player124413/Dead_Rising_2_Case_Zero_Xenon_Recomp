@@ -1,3 +1,6 @@
+#if !defined(__ANDROID__) || !defined(__aarch64__) || __ANDROID_API__ < 29
+#error "Build the runtime bridge with the Android ARM64 API 29+ target compiler"
+#endif
 #include "runtime_bridge.h"
 #include "touch_state.h"
 #include "vulkan_loader.h"
