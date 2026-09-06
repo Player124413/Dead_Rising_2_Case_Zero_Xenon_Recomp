@@ -4,6 +4,7 @@ package com.casezero.launcher;
 final class RuntimeBridge {
     static native void touch(int buttons, float lx, float ly, float rx, float ry, int lt, int rt);
     static native void pause(boolean paused);
+    static native void surface(android.view.Surface surface);
     static native void quit();
     static native long frames();
     static native String status();

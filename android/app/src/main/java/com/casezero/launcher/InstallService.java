@@ -33,7 +33,7 @@ public final class InstallService extends Service {
     static void cancel() { cancel.set(true); }
     static void begin(Context context, String action, Uri uri) {
         Intent intent = new Intent(context, InstallService.class).setAction(action).setData(uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        intent.addFlags(BACKUP.equals(action) ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : Intent.FLAG_GRANT_READ_URI_PERMISSION);
         context.startForegroundService(intent);
     }
     @Override public IBinder onBind(Intent intent) { return null; }
@@ -147,7 +147,8 @@ public final class InstallService extends Service {
     }
     private void clearCaches(AppPaths p) throws IOException {
         SafeFiles.deleteTree(new File(p.assets, "shader_spv"));
-        // Renderer keeps the pipeline cache inside shader_spv. No saves are under assets.
+        SafeFiles.deleteTree(new File(p.files, "cache"));
+        // Native pipeline/golden caches and temporary files; saves are separate.
     }
     private void copyTree(Uri tree, String id, File dst, int depth, SafeFiles.Budget budget) throws IOException {
         if (depth > 32) throw new IOException("Folder is nested too deeply");

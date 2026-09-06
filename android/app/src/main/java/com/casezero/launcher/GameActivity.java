@@ -43,6 +43,16 @@ public final class GameActivity extends SDLActivity {
         super.onCreate(state);
         if (mLayout == null) return; // SDL displays its native-library load error itself.
         nativeLoaded = true;
+        mSurface.getHolder().addCallback(new SurfaceHolder.Callback() {
+            private void update(SurfaceHolder holder) {
+                Surface surface = holder.getSurface();
+                RuntimeBridge.surface(surface != null && surface.isValid() ? surface : null);
+            }
+            @Override public void surfaceCreated(SurfaceHolder holder) { update(holder); }
+            @Override public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) { update(holder); }
+            @Override public void surfaceDestroyed(SurfaceHolder holder) { RuntimeBridge.surface(null); }
+        });
+        if (mSurface.getHolder().getSurface().isValid()) RuntimeBridge.surface(mSurface.getHolder().getSurface());
         FrameLayout overlays = new FrameLayout(this);
         touch = new TouchControlsView(this, false, RuntimeBridge::touch);
         overlays.addView(touch, new FrameLayout.LayoutParams(-1, -1));
@@ -105,12 +115,17 @@ public final class GameActivity extends SDLActivity {
         }
     };
     @Override protected void onPause() {
+        handler.removeCallbacks(poll);
         if (nativeLoaded) { touch.release(); RuntimeBridge.pause(true); }
         super.onPause();
     }
     @Override protected void onResume() {
         super.onResume();
-        if (nativeLoaded) RuntimeBridge.pause(false);
+        if (nativeLoaded) {
+            RuntimeBridge.pause(false);
+            lastTime = SystemClock.elapsedRealtime(); lastFrames = RuntimeBridge.frames();
+            handler.removeCallbacks(poll); handler.postDelayed(poll, 250);
+        }
     }
     @Override public void onBackPressed() {
         if (!nativeLoaded) { super.onBackPressed(); return; }
@@ -136,7 +151,7 @@ public final class GameActivity extends SDLActivity {
     }
     @Override protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
-        if (nativeLoaded) { RuntimeBridge.pause(false); touch.release(); }
+        if (nativeLoaded) { RuntimeBridge.quit(); touch.release(); }
         super.onDestroy();
         if (session != null) try { session.close(); } catch (IOException e) { android.util.Log.w("CaseZero", "Session lock", e); }
         // The runtime contains process-lifetime guest threads and globals. Never

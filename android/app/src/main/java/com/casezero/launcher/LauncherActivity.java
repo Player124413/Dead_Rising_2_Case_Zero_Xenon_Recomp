@@ -21,6 +21,7 @@ public final class LauncherActivity extends Activity implements InstallService.L
     private LinearLayout content;
     private TextView gameStatus, transferStatus, gpuStatus, sessionStatus;
     private ProgressBar progress;
+    private Switch customDriverSwitch;
     private Button play, cancel;
     private String gpu = "";
     private boolean libraries;
@@ -86,6 +87,7 @@ public final class LauncherActivity extends Activity implements InstallService.L
         Ui.button(this, driver, R.string.probe, this::probe);
         Ui.button(this, driver, R.string.import_driver, () -> Ui.confirm(this, R.string.driver_confirm, () -> pick(PICK_DRIVER)));
         Switch custom = new Switch(this);
+        customDriverSwitch = custom;
         custom.setText(R.string.custom_driver); custom.setMinHeight(Ui.dp(this, 52));
         custom.setChecked(new File(paths.driver, "enabled").isFile());
         custom.setOnClickListener(view -> {
@@ -154,11 +156,12 @@ public final class LauncherActivity extends Activity implements InstallService.L
         if (session.isFile()) try {
             String previous = SafeFiles.readText(session, 8192).trim();
             sessionStatus.setText(getString(R.string.last_session, previous));
-            if (previous.equals("driver-failed")) try (AppPaths.Lock ignored = paths.lock()) {
+            if (previous.equals("driver-failed") || previous.equals("driver-starting")) try (AppPaths.Lock ignored = paths.lock()) {
                 File enabled = new File(paths.driver, "enabled");
                 if (enabled.exists() && enabled.delete()) sessionStatus.setText(R.string.driver_recovered);
             }
         } catch (IOException e) { sessionStatus.setText(e.getMessage()); }
+        if (customDriverSwitch != null) customDriverSwitch.setChecked(new File(paths.driver, "enabled").isFile());
     }
     @Override public void changed(boolean active, long bytes, String result) {
         if (isFinishing() || content == null) return;
@@ -183,7 +186,7 @@ public final class LauncherActivity extends Activity implements InstallService.L
         super.onActivityResult(request, result, data);
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
-        int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        int flags = data.getFlags() & (request == EXPORT_SAVES ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : Intent.FLAG_GRANT_READ_URI_PERMISSION);
         if ((data.getFlags() & Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0) {
             try { getContentResolver().takePersistableUriPermission(uri, flags); } catch (SecurityException e) { android.util.Log.w("CaseZero", "Transient document grant", e); }
         }

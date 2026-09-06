@@ -13,8 +13,10 @@ bool AndroidVulkan_Load(const char* libs, const char* dir, const char* name, std
         if (!libs || !*libs || !dir || !*dir || std::string(name).find('/') != std::string::npos) {
             error = "Invalid app-private driver path"; return false;
         }
+        // adrenotools concatenates directory + filename without inserting '/'.
+        const std::string driverDir = std::string(dir) + "/";
         handle = adrenotools_open_libvulkan(RTLD_NOW | RTLD_LOCAL,
-            ADRENOTOOLS_DRIVER_CUSTOM, nullptr, libs, dir, name, nullptr, nullptr);
+            ADRENOTOOLS_DRIVER_CUSTOM, nullptr, libs, driverDir.c_str(), name, nullptr, nullptr);
     } else {
         handle = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
     }

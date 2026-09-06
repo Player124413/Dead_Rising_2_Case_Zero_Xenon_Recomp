@@ -153,6 +153,7 @@ int Host_DisplayModeList(uint32_t*, int) { return 0; }
 #ifdef __ANDROID__
 #include <SDL_syswm.h>
 #include "../android/runtime_bridge.h"
+#include <android/native_window.h>
 #include "../android/touch_state.h"
 #endif
 
@@ -2121,13 +2122,15 @@ bool Host_VulkanCreateSurface(void* instance, uint64_t* outSurface)
         return false;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
 #ifdef __ANDROID__
-    SDL_SysWMinfo info{};
-    SDL_VERSION(&info.version);
-    if (!SDL_GetWindowWMInfo(g_window, &info) || !info.info.android.window) return false;
+    // Own a reference while creating the Vulkan surface. A borrowed SDL WMInfo
+    // pointer can be released by Java's surfaceDestroyed callback concurrently.
+    ANativeWindow* window = Android_AcquireWindow();
+    if (!window) return false;
     VkAndroidSurfaceCreateInfoKHR ci{VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR};
-    ci.window = info.info.android.window;
-    if (vkCreateAndroidSurfaceKHR(static_cast<VkInstance>(instance), &ci, nullptr, &surface) != VK_SUCCESS)
-        return false;
+    ci.window = window;
+    const VkResult rc = vkCreateAndroidSurfaceKHR(static_cast<VkInstance>(instance), &ci, nullptr, &surface);
+    ANativeWindow_release(window);
+    if (rc != VK_SUCCESS) return false;
 #else
     if (!SDL_Vulkan_CreateSurface(g_window, static_cast<VkInstance>(instance), &surface))
     {

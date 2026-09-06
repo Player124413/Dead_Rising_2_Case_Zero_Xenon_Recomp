@@ -365,13 +365,19 @@ int main(int argc, char** argv)
             {
                 if (!progressWindow)
                     progressWindow = Host_ProgressBegin("PREPARING FIRST RUN");
-                ShaderPrebuild::BuildFromDisc(bank, HostPaths::ShaderCache(),
+                const int shaderResult = ShaderPrebuild::BuildFromDisc(bank, HostPaths::ShaderCache(),
                     [](unsigned done, size_t total) {
                         char l[64];
                         snprintf(l, sizeof l, "PREPARING SHADERS - %u OF %zu",
                                  done, total);
                         Host_ProgressUpdate(l, total ? float(done) / float(total) : 1.f);
                     });
+                if (shaderResult != 0)
+                {
+                    if (progressWindow) Host_ProgressEnd();
+                    fprintf(stderr, "[shaders] Preparation failed; refusing to boot with a partial cache.\n");
+                    return 1;
+                }
             }
         }
         // Release-github §0: the patched-asset overlays (the PC options screen,

@@ -3,7 +3,10 @@
 #include "vulkan_loader.h"
 #include "../gpu/vk_renderer.h"
 #include "../host/window.h"
+#include "../kernel/memory.h"
+#include "../cpu/timebase.h"
 #include <jni.h>
+#include <android/native_window_jni.h>
 #include <atomic>
 #include <condition_variable>
 #include <cstdio>
@@ -19,7 +22,10 @@ int CzRuntimeMain(int argc, char** argv);
 namespace {
 std::mutex statusMutex, pauseMutex;
 std::condition_variable pauseChanged;
-bool paused = false;
+bool paused = false, quitting = false;
+ANativeWindow* nativeWindow = nullptr;
+std::atomic<bool> surfaceChanged{false};
+bool customDriver = false;
 std::string status = "Starting";
 std::filesystem::path files;
 std::atomic<uint64_t> frames{0};
@@ -35,11 +41,37 @@ void Android_Progress(const char* label, float fraction) {
     status = std::string(label ? label : "") + "\n" + std::to_string(fraction);
 }
 void Android_FramePresented() { frames.fetch_add(1, std::memory_order_relaxed); }
+[[noreturn]] void Android_Fatal(const char* error) {
+    fprintf(stderr, "[android] FATAL: %s\n", error);
+    Session(customDriver ? "driver-failed" : "failed (see runtime.log)");
+    fflush(nullptr);
+    std::_Exit(1);
+}
 void Android_MarkStopped() { Session("stopped"); }
 void Android_MarkPlaying() { Session("running"); Android_Progress("", 1.f); }
 void Android_WaitForeground() {
     std::unique_lock<std::mutex> lock(pauseMutex);
-    pauseChanged.wait(lock, [] { return !paused; });
+    pauseChanged.wait(lock, [] { return quitting || (!paused && nativeWindow != nullptr); });
+}
+ANativeWindow* Android_AcquireWindow() {
+    std::lock_guard<std::mutex> lock(pauseMutex);
+    if (nativeWindow) ANativeWindow_acquire(nativeWindow);
+    return nativeWindow;
+}
+bool Android_TakeSurfaceChanged() { return surfaceChanged.exchange(false); }
+void Android_InvalidateSurface() { surfaceChanged.store(true); }
+extern "C" JNIEXPORT void JNICALL
+Java_com_casezero_launcher_RuntimeBridge_surface(JNIEnv* env, jclass, jobject surface) {
+    ANativeWindow* fresh = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
+    {
+        std::lock_guard<std::mutex> lock(pauseMutex);
+        if (nativeWindow) ANativeWindow_release(nativeWindow);
+        nativeWindow = fresh;
+        cz_timebase::set_paused(!quitting && (paused || nativeWindow == nullptr));
+        surfaceChanged.store(true);
+    }
+    if (!fresh) AndroidTouch_Clear();
+    pauseChanged.notify_all();
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_casezero_launcher_RuntimeBridge_touch(JNIEnv*, jclass, jint buttons,
@@ -49,13 +81,18 @@ Java_com_casezero_launcher_RuntimeBridge_touch(JNIEnv*, jclass, jint buttons,
 extern "C" JNIEXPORT void JNICALL
 Java_com_casezero_launcher_RuntimeBridge_pause(JNIEnv*, jclass, jboolean value) {
     AndroidTouch_Clear();
-    { std::lock_guard<std::mutex> lock(pauseMutex); paused = value; }
+    {
+        std::lock_guard<std::mutex> lock(pauseMutex);
+        paused = value;
+        cz_timebase::set_paused(!quitting && (paused || nativeWindow == nullptr));
+    }
     pauseChanged.notify_all();
     if (!value) VkRenderer_RequestSwapchainRebuild();
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_casezero_launcher_RuntimeBridge_quit(JNIEnv*, jclass) {
-    { std::lock_guard<std::mutex> lock(pauseMutex); paused = false; }
+    cz_timebase::set_paused(false);
+    { std::lock_guard<std::mutex> lock(pauseMutex); paused = false; quitting = true; }
     pauseChanged.notify_all();
     AndroidTouch_Clear();
     Host_RequestQuit("Return to Android launcher");
@@ -89,6 +126,11 @@ extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** 
     Env("CZ_ROOT", (files / "runtime").string());
     Env("CZ_SAVE_DIR", (files / "saves").string());
     Env("CZ_ANDROID_LIBRARY_DIR", libs);
+    std::filesystem::create_directories(files / "cache/tmp", ec);
+    Env("TMPDIR", (files / "cache/tmp").string());
+    Env("XDG_CACHE_HOME", (files / "cache").string());
+    Env("CZ_VK_PIPELINE_CACHE_FILE", (files / "cache/pipeline.bin").string());
+    Env("CZ_GOLDEN_DIR", (files / "cache").string());
     Env("CZ_DXC_LIB", libs + "/libdxcompiler.so");
     Env("CZ_VKDRAW", "1"); Env("CZ_LAUNCHER", "0");
     Env("CZ_VK_RT", "0"); Env("CZ_VK_RT_SHADOWS", "0");
@@ -110,17 +152,20 @@ extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** 
     if (std::string(argv[1]) == "--android-smoke") {
         char program[] = "cz_runtime", smoke[] = "--smoke";
         char* arguments[] = {program, smoke, nullptr};
+        Session("smoke-running");
         const int rc = CzRuntimeMain(2, arguments);
+        if (rc == 0) g_memory.Init(); // real 4 GiB reservation + physical-alias self-test on the phone
         Session(rc == 0 ? "smoke-ok (stub, not gameplay)" : "smoke-failed");
         return rc;
     }
     Session("starting");
     const auto driver = files / "driver";
-    const bool custom = std::filesystem::exists(driver / "enabled");
+    customDriver = std::filesystem::exists(driver / "enabled");
+    if (customDriver) Session("driver-starting");
     std::string error;
-    if (!AndroidVulkan_Load(libs.c_str(), driver.c_str(), custom ? "driver.so" : "", error)) {
+    if (!AndroidVulkan_Load(libs.c_str(), driver.c_str(), customDriver ? "driver.so" : "", error)) {
         fprintf(stderr, "[android] %s\n", error.c_str());
-        Session("driver-failed"); return 1;
+        Session(customDriver ? "driver-failed" : "failed to load system Vulkan"); return 1;
     }
     char program[] = "cz_runtime";
     char* arguments[] = {program, nullptr};

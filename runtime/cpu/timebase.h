@@ -58,6 +58,10 @@ namespace cz_timebase {
 extern uint64_t host_hz;
 
 uint64_t host_rdtsc();   // the real host counter, unshadowed
+#ifdef __ANDROID__
+uint64_t running_host_ticks(); // excludes time spent in the Android background
+void set_paused(bool value);
+#endif
 bool init();             // calibrate host_hz; false means measurement failed
 
 // CZ_DETERMINISTIC_CLOCK — a guest clock that advances a fixed quantum per PRESENTED
@@ -94,7 +98,11 @@ inline uint64_t guest_ticks()
 {
     if (deterministic)
         return virtual_ticks;
+#ifdef __ANDROID__
+    return uint64_t((__uint128_t(running_host_ticks()) * CZ_TIMEBASE_HZ) / host_hz);
+#else
     return uint64_t((__uint128_t(host_rdtsc()) * CZ_TIMEBASE_HZ) / host_hz);
+#endif
 }
 
 }  // namespace cz_timebase

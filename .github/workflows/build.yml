@@ -61,11 +61,11 @@ jobs:
       - name: clone recompilers at pinned bases and apply local patches
         run: |
           git clone --recursive https://github.com/hedge-dev/XenonRecomp ../XenonRecomp
-          git -C ../XenonRecomp checkout $XENON_BASE
+          git -C ../XenonRecomp checkout "$XENON_BASE"
           git -C ../XenonRecomp submodule update --init --recursive
           git -C ../XenonRecomp apply "$PWD/tools/ci/xenonrecomp-local.patch"
           git clone https://github.com/hedge-dev/XenosRecomp ../XenosRecomp
-          git -C ../XenosRecomp checkout $XENOS_BASE
+          git -C ../XenosRecomp checkout "$XENOS_BASE"
           git -C ../XenosRecomp submodule update --init thirdparty/dxc-bin
           git -C ../XenosRecomp apply "$PWD/tools/ci/xenosrecomp-local.patch"
 
@@ -85,11 +85,26 @@ jobs:
             -DCZ_PPC_DIR="$PWD/../stub-ppc" \
             -DXENON_ROOT="$PWD/../XenonRecomp" \
             -DXENON_BUILD="$PWD/../XenonRecomp/build" \
-            -DXENOS_ROOT="$PWD/../XenosRecomp"
-          cmake --build runtime/build -j2
+            -DXENOS_ROOT="$PWD/../XenosRecomp" 2>&1 | tee linux-configure.log
+          cmake --build runtime/build -j2 2>&1 | tee linux-build.log
 
       - name: smoke against the stub image
         run: runtime/build/cz_runtime --smoke
+
+      - name: Expose native errors through the checks API
+        if: failure()
+        run: python3 tools/ci/report_failure.py linux-configure.log linux-build.log
+
+      - name: Keep Linux diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-logs
+          if-no-files-found: ignore
+          path: |
+            linux-configure.log
+            linux-build.log
+            runtime/build/CMakeFiles/CMakeConfigureLog.yaml
 
   windows:
     runs-on: windows-2022
@@ -128,7 +143,7 @@ jobs:
           & "$root/bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$root/vcpkg.exe" install 'sdl2:x64-windows' 'ffmpeg[avcodec]:x64-windows' `
-            'vulkan-headers:x64-windows' 'vulkan-loader:x64-windows'
+            'vulkan-headers:x64-windows' 'vulkan-loader:x64-windows' 2>&1 | Tee-Object vcpkg.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "VCPKG_INSTALLATION_ROOT=$root" >> $env:GITHUB_ENV
 
@@ -136,11 +151,11 @@ jobs:
         shell: bash
         run: |
           git clone --recursive https://github.com/hedge-dev/XenonRecomp ../XenonRecomp
-          git -C ../XenonRecomp checkout $XENON_BASE
+          git -C ../XenonRecomp checkout "$XENON_BASE"
           git -C ../XenonRecomp submodule update --init --recursive
           git -C ../XenonRecomp apply "$PWD/tools/ci/xenonrecomp-local.patch"
           git clone https://github.com/hedge-dev/XenosRecomp ../XenosRecomp
-          git -C ../XenosRecomp checkout $XENOS_BASE
+          git -C ../XenosRecomp checkout "$XENOS_BASE"
           git -C ../XenosRecomp submodule update --init thirdparty/dxc-bin
           git -C ../XenosRecomp apply "$PWD/tools/ci/xenosrecomp-local.patch"
 
@@ -196,6 +211,10 @@ jobs:
           runtime/build/cz_runtime.exe --smoke 2>&1 | Tee-Object smoke.log
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Expose Windows errors through the checks API
+        if: failure()
+        run: python tools/ci/report_failure.py configure.log build.log smoke.log vcpkg.log
+
       - name: publish the logs the API cannot serve
         if: always()
         uses: actions/upload-artifact@v4
@@ -206,5 +225,6 @@ jobs:
             configure.log
             build.log
             smoke.log
+            vcpkg.log
             runtime/build/CMakeFiles/CMakeError.log
             runtime/build/CMakeFiles/CMakeConfigureLog.yaml

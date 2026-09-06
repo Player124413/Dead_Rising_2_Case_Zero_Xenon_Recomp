@@ -19,7 +19,12 @@ jobs:
           go-version: '1.24.x'
           cache: false
       - name: Validate every workflow
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color
+        run: |
+          set -o pipefail
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color 2>&1 | tee actionlint.log
+      - name: Expose workflow errors through the checks API
+        if: failure()
+        run: python3 tools/ci/report_failure.py actionlint.log
       - name: Test import, input and BC texture decoding under ASan and UBSan
         run: |
           mkdir -p build/portable-tests

@@ -45,7 +45,9 @@ jobs:
           key: android-ndk27-${{ hashFiles('tools/android/dependencies.json', 'tools/android/bootstrap.py', 'tools/android/build_ffmpeg.sh', 'tools/android/build_dxc.sh', 'tools/ci/*.patch') }}
       - name: Fetch locked sources (no game inputs)
         id: bootstrap
-        run: python3 tools/android/bootstrap.py --dxc
+        run: |
+          set -o pipefail
+          python3 tools/android/bootstrap.py --dxc 2>&1 | tee android-bootstrap.log
       - name: Build real Android host runtime against stub guest code
         shell: bash
         run: |
@@ -75,6 +77,9 @@ jobs:
           name: CaseZero-Android-DIAGNOSTIC-arm64-v8a
           path: android/app/build/outputs/apk/diagnostic/debug/*.apk
           if-no-files-found: error
+      - name: Expose build errors through the checks API
+        if: failure()
+        run: python3 tools/ci/report_failure.py android-bootstrap.log android-native.log android-gradle.log
       - name: Publish build and test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -82,6 +87,7 @@ jobs:
           name: Android-build-logs
           if-no-files-found: ignore
           path: |
+            android-bootstrap.log
             android-native.log
             android-gradle.log
             android/app/build/reports/

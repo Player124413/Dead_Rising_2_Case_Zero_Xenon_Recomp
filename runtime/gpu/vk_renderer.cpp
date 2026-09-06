@@ -6503,12 +6503,18 @@ bool CreateDevice()
     // correct, so degrading to it is safe as long as the run knows which one it got.
     if (R->wantSwapchain)
     {
+#ifdef __ANDROID__
+        Android_WaitForeground();
+#endif
         uint64_t surfaceHandle = 0;
         if (!Host_VulkanCreateSurface(R->instance, &surfaceHandle) || !surfaceHandle)
         {
             fprintf(stderr, "[vk] swapchain: no surface — presenting through the "
                             "readback path instead.\n");
             R->wantSwapchain = false;
+#ifdef __ANDROID__
+            Android_Fatal("Cannot create the Android Vulkan surface");
+#endif
         }
         else
         {
@@ -6527,6 +6533,9 @@ bool CreateDevice()
                 vkDestroySurfaceKHR(R->instance, R->swap.surface, nullptr);
                 R->swap.surface = VK_NULL_HANDLE;
                 R->wantSwapchain = false;
+#ifdef __ANDROID__
+                Android_Fatal("Graphics queue cannot present to the Android surface");
+#endif
             }
         }
     }
@@ -6683,7 +6692,6 @@ bool CreateDevice()
     VK_CHECK(vkCreateDevice(R->physical, &dci, nullptr, &R->device), "vkCreateDevice");
 #ifdef __ANDROID__
     volkLoadDevice(R->device);
-    Android_MarkPlaying();
 #endif
     vkGetDeviceQueue(R->device, R->queueFamily, 0, &R->queue);
     // PART 81 §1.1 — resolve the device command table before anything can record. Fatal
@@ -12410,9 +12418,15 @@ void DestroySwapchainObjects()
 bool CreateSwapchain(uint32_t wantW, uint32_t wantH)
 {
     VkSurfaceCapabilitiesKHR caps{};
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(R->physical, R->swap.surface, &caps)
-        != VK_SUCCESS)
+    const VkResult surfaceStatus = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(R->physical, R->swap.surface, &caps);
+    if (surfaceStatus != VK_SUCCESS)
+    {
+#ifdef __ANDROID__
+        if (surfaceStatus == VK_ERROR_SURFACE_LOST_KHR) Android_InvalidateSurface();
+        else Android_Fatal("Cannot query Vulkan surface capabilities");
+#endif
         return false;
+    }
 
     // `currentExtent` of 0xFFFFFFFF means "you choose"; anything else is binding, and
     // arguing with it produces a swapchain the compositor immediately calls suboptimal.
@@ -12534,6 +12548,11 @@ bool CreateSwapchain(uint32_t wantW, uint32_t wantH)
     sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     sci.preTransform = caps.currentTransform;
     sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    if (!(caps.supportedCompositeAlpha & sci.compositeAlpha))
+        for (uint32_t bit = 1; bit <= VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR; bit <<= 1)
+            if (caps.supportedCompositeAlpha & bit) {
+                sci.compositeAlpha = static_cast<VkCompositeAlphaFlagBitsKHR>(bit); break;
+            }
     sci.presentMode = mode;
     sci.clipped = VK_TRUE;
     sci.oldSwapchain = old;
@@ -12542,6 +12561,10 @@ bool CreateSwapchain(uint32_t wantW, uint32_t wantH)
     if (rc != VK_SUCCESS)
     {
         fprintf(stderr, "[vk] vkCreateSwapchainKHR failed (%d)\n", int(rc));
+#ifdef __ANDROID__
+        if (rc == VK_ERROR_SURFACE_LOST_KHR) Android_InvalidateSurface();
+        else if (rc != VK_ERROR_OUT_OF_DATE_KHR) Android_Fatal("Cannot create Vulkan swapchain");
+#endif
         return false;
     }
     // Idle the device before tearing the previous swapchain's objects down. A rebuild
@@ -12609,10 +12632,38 @@ bool CreateSwapchain(uint32_t wantW, uint32_t wantH)
 // thread; this one can be set from the guest thread running a menu verb. The exported
 // setter is defined at global scope near VkRenderer_DumpStats.
 std::atomic<bool> g_swapRebuildRequest{ false };
+#ifdef __ANDROID__
+constexpr uint64_t kAcquireTimeout = 100'000'000; // finite: background/quit must not hang the pump
+#else
+constexpr uint64_t kAcquireTimeout = UINT64_MAX;
+#endif
 
 void RecordSwapchainBlit(Image& source, uint32_t width, uint32_t height)
 {
     R->swap.acquired = UINT32_MAX;
+#ifdef __ANDROID__
+    Android_WaitForeground();
+    if (Android_TakeSurfaceChanged() || !R->swap.surface)
+    {
+        // Only past frames reference swapchain images here: this frame has not
+        // acquired/recorded its blit yet. Retire submitted work before replacing
+        // semaphores AND VkSurfaceKHR (a resize-only rebuild is insufficient).
+        if (vkDeviceWaitIdle(R->device) != VK_SUCCESS) Android_Fatal("Vulkan device lost on resume");
+        DestroySwapchainObjects();
+        if (R->swap.surface) vkDestroySurfaceKHR(R->instance, R->swap.surface, nullptr);
+        R->swap.surface = VK_NULL_HANDLE;
+        uint64_t handle = 0;
+        if (!Host_VulkanCreateSurface(R->instance, &handle) || !handle) {
+            Android_InvalidateSurface();
+            return; // surfaceDestroyed/Created may be between their callbacks
+        }
+        R->swap.surface = reinterpret_cast<VkSurfaceKHR>(handle);
+        VkBool32 supported = VK_FALSE;
+        if (vkGetPhysicalDeviceSurfaceSupportKHR(R->physical, R->queueFamily, R->swap.surface, &supported) != VK_SUCCESS || !supported)
+            Android_Fatal("Recreated Android surface cannot present");
+        R->swap.rebuildWanted = true;
+    }
+#endif
     if (g_swapRebuildRequest.exchange(false, std::memory_order_acq_rel))
         R->swap.rebuildWanted = true;
 
@@ -12699,7 +12750,7 @@ void RecordSwapchainBlit(Image& source, uint32_t width, uint32_t height)
 
     VkSemaphore acq = R->swap.acquireSem[R->swap.acquireIndex];
     uint32_t index = 0;
-    VkResult rc = vkAcquireNextImageKHR(R->device, R->swap.swapchain, UINT64_MAX, acq,
+    VkResult rc = vkAcquireNextImageKHR(R->device, R->swap.swapchain, kAcquireTimeout, acq,
                                         VK_NULL_HANDLE, &index);
     if (rc == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -12716,7 +12767,7 @@ void RecordSwapchainBlit(Image& source, uint32_t width, uint32_t height)
             return;
         }
         acq = R->swap.acquireSem[R->swap.acquireIndex];
-        rc = vkAcquireNextImageKHR(R->device, R->swap.swapchain, UINT64_MAX, acq,
+        rc = vkAcquireNextImageKHR(R->device, R->swap.swapchain, kAcquireTimeout, acq,
                                    VK_NULL_HANDLE, &index);
     }
     if (rc == VK_SUBOPTIMAL_KHR)
@@ -12729,6 +12780,11 @@ void RecordSwapchainBlit(Image& source, uint32_t width, uint32_t height)
     }
     else if (rc != VK_SUCCESS)
     {
+#ifdef __ANDROID__
+        if (rc == VK_ERROR_SURFACE_LOST_KHR) Android_InvalidateSurface();
+        else if (rc != VK_TIMEOUT && rc != VK_NOT_READY && rc != VK_ERROR_OUT_OF_DATE_KHR)
+            Android_Fatal("Vulkan image acquisition failed");
+#endif
         R->swap.acquireFails++;
         Count("swap: vkAcquireNextImageKHR failed, frame DROPPED");
         return;
@@ -13084,6 +13140,10 @@ void PresentSwapchain()
     }
     else
     {
+#ifdef __ANDROID__
+        if (rc == VK_ERROR_SURFACE_LOST_KHR) Android_InvalidateSurface();
+        else Android_Fatal("Vulkan presentation failed");
+#endif
         Count("swap: vkQueuePresentKHR FAILED");
         R->swap.acquireFails++;
     }
@@ -26141,6 +26201,9 @@ bool InitCommon()
         fprintf(stderr, "[vk] stream census POISONED — the content check must now read "
                         "0.0%%; anything else means it cannot fail\n");
     g_active = true;
+#ifdef __ANDROID__
+    Android_MarkPlaying();
+#endif
     fprintf(stderr, "[vk] renderer UP: %ux%u target, %zu shaders\n", R->targetWidth,
             R->targetHeight, R->shadersMap.size());
     if (ResScale() != 1)
@@ -26171,7 +26234,11 @@ bool VkRenderer_Init()
         return false;
     }
     // InitCommon names its own failure on every path.
-    return InitCommon();
+    const bool ready = InitCommon();
+#ifdef __ANDROID__
+    if (!ready) Android_Fatal("Renderer initialization failed; see the Vulkan errors above");
+#endif
+    return ready;
 }
 
 void VkRenderer_Draw(uint8_t* base, const Pm4Draw& draw)
@@ -29107,7 +29174,12 @@ bool VkRenderer_D3DInit()
         return false;
     }
     if (!InitCommon())
+    {
+#ifdef __ANDROID__
+        Android_Fatal("D3D renderer initialization failed; see the Vulkan errors above");
+#endif
         return false;
+    }
     g_d3dMode = true;
     ok = true;
     fprintf(stderr, "[vk] renderer feed: D3D draw service (phase C)\n");

@@ -1,4 +1,5 @@
 #include "../gpu/bcn_decode.h"
+#include "../cpu/paused_clock.h"
 #include "../android/touch_state.h"
 #include "../host/stfs_extract.h"
 #include <algorithm>
@@ -14,6 +15,38 @@
 #include <vector>
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); std::abort(); } } while (false)
 namespace fs = std::filesystem;
+
+void ClockTests() {
+    PausedClock clock;
+    CHECK(clock.Read(50) == 50);
+    clock.SetPaused(true, 100);
+    CHECK(clock.Read(100) == 100 && clock.Read(1000) == 100);
+    clock.SetPaused(true, 500); // repeated onPause does not restart the exclusion period
+    clock.SetPaused(false, 600);
+    CHECK(clock.Read(601) == 101 && clock.Read(99) == 100); // pre-transition sample is clamped
+    clock.SetPaused(false, 605);
+    clock.SetPaused(true, 700);
+    CHECK(clock.Read(999) == 200);
+    clock.SetPaused(false, 900);
+    CHECK(clock.Read(901) == 201);
+    PausedClock concurrent;
+    std::atomic<uint64_t> raw{1};
+    std::atomic<bool> done{false};
+    std::thread writer([&] {
+        for (unsigned i=0; i<30000; ++i) {
+            concurrent.SetPaused(true, raw.fetch_add(1));
+            concurrent.SetPaused(false, raw.fetch_add(1));
+        }
+        done.store(true);
+    });
+    uint64_t last = 0;
+    while (!done.load()) {
+        const uint64_t now = concurrent.Read(raw.load());
+        CHECK(now >= last && now <= raw.load());
+        last = now;
+    }
+    writer.join();
+}
 
 void BcnTests() {
     std::vector<uint8_t> p;
@@ -105,6 +138,6 @@ void StfsTests(const fs::path& dir) {
 #endif
 }
 int main(int argc, char** argv) {
-    CHECK(argc==2); BcnTests(); TouchTests(); StfsTests(fs::absolute(argv[1]));
-    std::puts("OK: BC1-5 decoding, touch snapshots, bounded STFS extraction");
+    CHECK(argc==2); ClockTests(); BcnTests(); TouchTests(); StfsTests(fs::absolute(argv[1]));
+    std::puts("OK: paused clock, BC1-5 decoding, touch snapshots, bounded STFS extraction");
 }

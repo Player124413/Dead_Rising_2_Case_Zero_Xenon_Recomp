@@ -11,6 +11,9 @@
 #include <thread>
 
 #include "timebase.h"
+#ifdef __ANDROID__
+#include "paused_clock.h"
+#endif
 
 namespace cz_timebase {
 
@@ -28,6 +31,12 @@ uint64_t host_rdtsc()
 }
 #else
 #error "no host cycle counter for this architecture"
+#endif
+
+#ifdef __ANDROID__
+namespace { PausedClock backgroundClock; }
+uint64_t running_host_ticks() { return backgroundClock.Read(host_rdtsc()); }
+void set_paused(bool value) { backgroundClock.SetPaused(value, host_rdtsc()); }
 #endif
 
 namespace {
