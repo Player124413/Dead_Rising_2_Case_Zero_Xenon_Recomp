@@ -31,6 +31,7 @@ public final class LauncherActivity extends Activity implements InstallService.L
         try {
             paths.init();
             if (!InstallService.busy()) try (AppPaths.Lock ignored = paths.lock()) { paths.recover(); SafeFiles.mkdir(paths.saves); }
+            catch (AppPaths.Busy busy) { /* the active runtime/transfer owns recovery; not a library-load failure */ }
             settings = new GraphicsSettings(this);
             libraries = NativeSupport.diagnostic() == BuildConfig.DIAGNOSTIC;
         } catch (Exception | LinkageError e) {
@@ -153,7 +154,15 @@ public final class LauncherActivity extends Activity implements InstallService.L
     }
     @Override protected void onStart() { super.onStart(); if (content != null) InstallService.observe(this); }
     @Override protected void onStop() { InstallService.unobserve(this); super.onStop(); }
-    @Override protected void onResume() { super.onResume(); if (content != null) refresh(); }
+    @Override protected void onResume() {
+        super.onResume();
+        if (content == null) return;
+        if (!InstallService.busy()) try (AppPaths.Lock ignored = paths.lock()) {
+            GraphicsSettings disk = new GraphicsSettings(this);
+            if (!disk.sameValues(settings)) { settings = disk; buildUi(); }
+        } catch (IOException e) { android.util.Log.d("CaseZero", "Settings reload deferred", e); }
+        refresh();
+    }
     private void refresh() {
         if (gameStatus == null) return;
         boolean valid = false;
@@ -216,6 +225,8 @@ public final class LauncherActivity extends Activity implements InstallService.L
     private void launch() {
         try (AppPaths.Lock ignored = paths.lock()) {
             if (!BuildConfig.DIAGNOSTIC) { GameFiles.validate(paths.game); settings.save(); }
+            // Flush pending layout/control preference writes before :runtime reads them.
+            if (!settings.prefs.edit().commit()) throw new IOException("Cannot persist control settings");
         } catch (IOException e) { Ui.error(this, e); return; }
         startActivity(new Intent(this, GameActivity.class).putExtra("smoke", BuildConfig.DIAGNOSTIC));
     }

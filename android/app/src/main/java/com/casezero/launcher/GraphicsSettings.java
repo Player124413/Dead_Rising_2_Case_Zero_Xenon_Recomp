@@ -17,10 +17,19 @@ final class GraphicsSettings {
         Properties p = new Properties();
         if (cfg.isFile()) try (InputStream in = new FileInputStream(cfg)) { p.load(in); }
         width = number(p, "res_w", 1280, 1280, 6880); height = number(p, "res_h", 720, 720, 2880);
+        if (!validSize(width, height)) { width = 1280; height = 720; }
         fps = number(p, "fps_cap", 30, 0, 480);
         if (fps != 30 && fps != 60 && fps != 90 && fps != 120 && fps != 240 && fps != 480 && fps != 0) fps = 30;
         shadow = number(p, "shadow_tier", 0, 0, 2); vsync = number(p, "vsync", 1, 0, 1) == 1;
         fov = number(p, "fov", 0, -10, 30); mouse = number(p, "mouse_sens", 5, 1, 10);
+    }
+    static boolean validSize(int width, int height) {
+        return width >= 1280 && height >= 720 && width <= 6880 && height <= 2880
+            && (width & 1) == 0 && (height & 1) == 0 && (long)width * 9 >= (long)height * 16;
+    }
+    boolean sameValues(GraphicsSettings other) {
+        return width == other.width && height == other.height && fps == other.fps && shadow == other.shadow
+            && vsync == other.vsync && fov == other.fov && mouse == other.mouse;
     }
     private static int number(Properties p, String key, int def, int min, int max) {
         try { int n = Integer.parseInt(p.getProperty(key, "")); return n >= min && n <= max ? n : def; }

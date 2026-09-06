@@ -72,6 +72,11 @@ android.applicationVariants.all { variant ->
     def mode = variant.flavorName
     def checkInputs = tasks.register("verify${variant.name.capitalize()}NativeInputs") {
         doLast {
+            if (variant.buildType.name == 'release') {
+                def signingVars = ['ANDROID_KEYSTORE_FILE', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
+                if (!signingVars.every { System.getenv(it) } || !file(System.getenv('ANDROID_KEYSTORE_FILE')).isFile())
+                    throw new GradleException('Release APKs require an explicit keystore and signing environment; no unsigned/debug fallback')
+            }
             def base = new File(generatedRoot, mode)
             def info = new File(base, 'assets/build-info.json')
             if (!info.isFile() || new groovy.json.JsonSlurper().parse(info).mode != mode)

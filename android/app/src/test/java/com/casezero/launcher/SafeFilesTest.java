@@ -84,4 +84,19 @@ public class SafeFilesTest {
     @Test public void boundedReadsRejectOversizedMetadata() {
         assertThrows(IOException.class, () -> SafeFiles.readLimited(new ByteArrayInputStream(new byte[65]),64));
     }
+    @Test public void crossProcessLeaseCannotOverlapAndCanBeReused() throws Exception {
+        File file = temp.newFile();
+        try (AppPaths.Lock first = new AppPaths.Lock(file)) {
+            assertThrows(AppPaths.Busy.class, () -> new AppPaths.Lock(file));
+        }
+        try (AppPaths.Lock second = new AppPaths.Lock(file)) { assertNotNull(second); }
+    }
+    @Test public void resolutionMatchesNativeBounds() {
+        assertTrue(GraphicsSettings.validSize(1280, 720));
+        assertTrue(GraphicsSettings.validSize(2560, 1080));
+        assertFalse(GraphicsSettings.validSize(640, 360));
+        assertFalse(GraphicsSettings.validSize(1281, 720));
+        assertFalse(GraphicsSettings.validSize(1280, 1080));
+        assertFalse(GraphicsSettings.validSize(8000, 720));
+    }
 }

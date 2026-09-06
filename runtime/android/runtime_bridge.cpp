@@ -141,6 +141,9 @@ extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** 
     Env("CZ_GOLDEN_DIR", (files / "cache").string());
     Env("CZ_DXC_LIB", libs + "/libdxcompiler.so");
     Env("CZ_VKDRAW", "1"); Env("CZ_LAUNCHER", "0");
+    // Touch and SDL controllers feed XInput. Desktop's native KB/M hooks would
+    // override that input path and replace Xbox prompts with keyboard glyphs.
+    Env("CZ_NO_NATIVE_KBM", "1");
     Env("CZ_VK_RT", "0"); Env("CZ_VK_RT_SHADOWS", "0");
     Env("SDL_TOUCH_MOUSE_EVENTS", "0"); Env("SDL_MOUSE_TOUCH_EVENTS", "0");
     Env("SDL_ANDROID_TRAP_BACK_BUTTON", "1");

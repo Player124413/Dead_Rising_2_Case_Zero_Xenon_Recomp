@@ -119,7 +119,7 @@ public final class InstallService extends Service {
                     try (InputStream in = input(uri)) { SafeFiles.unzip(in, incoming, budget); }
                 } else if (FOLDER.equals(action)) {
                     String doc = DocumentsContract.getTreeDocumentId(Objects.requireNonNull(uri));
-                    copyTree(uri, doc, incoming, 0, budget);
+                    copyTree(uri, doc, incoming, 0, budget, new HashSet<>());
                 } else if (DRIVER.equals(action)) { installDriver(uri, p, incoming); return; }
                 else throw new IOException("Unknown transfer action");
                 progress(bytes); // Cancellation always precedes the atomic commit.
@@ -150,7 +150,7 @@ public final class InstallService extends Service {
         SafeFiles.deleteTree(new File(p.files, "cache"));
         // Native pipeline/golden caches and temporary files; saves are separate.
     }
-    private void copyTree(Uri tree, String id, File dst, int depth, SafeFiles.Budget budget) throws IOException {
+    private void copyTree(Uri tree, String id, File dst, int depth, SafeFiles.Budget budget, Set<String> names) throws IOException {
         if (depth > 32) throw new IOException("Folder is nested too deeply");
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id);
         String[] cols = {DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -161,9 +161,10 @@ public final class InstallService extends Service {
                 String name = cursor.getString(1);
                 if (name == null || name.contains("/")) throw new IOException("Invalid document name");
                 File target = SafeFiles.resolve(dst, name);
+                if (!names.add(target.getCanonicalPath().toLowerCase(Locale.ROOT))) throw new IOException("Duplicate case-insensitive folder entry: " + name);
                 String child = cursor.getString(0);
                 if (DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2))) {
-                    budget.file(); budget.add(0); SafeFiles.mkdir(target); copyTree(tree, child, target, depth + 1, budget);
+                    budget.file(); budget.add(0); SafeFiles.mkdir(target); copyTree(tree, child, target, depth + 1, budget, names);
                 } else try (InputStream in = input(DocumentsContract.buildDocumentUriUsingTree(tree, child))) {
                     SafeFiles.copy(in, target, budget);
                 }

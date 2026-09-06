@@ -18,17 +18,25 @@ final class AppPaths {
         SafeFiles.recoverDirectory(game); SafeFiles.recoverDirectory(saves); SafeFiles.recoverDirectory(driver);
     }
     Lock lock() throws IOException { return new Lock(new File(files, "session.lock")); }
+    static final class Busy extends IOException { Busy() { super("A transfer or game session is already active"); } }
     static final class Lock implements AutoCloseable {
         private final RandomAccessFile file;
         private final FileLock lock;
         Lock(File path) throws IOException {
             file = new RandomAccessFile(path, "rw");
-            FileLock acquired;
-            try { acquired = file.getChannel().tryLock(); }
-            catch (OverlappingFileLockException e) { acquired = null; }
-            if (acquired == null) { file.close(); throw new IOException("A transfer or game session is already active"); }
-            lock = acquired;
+            try {
+                FileLock acquired;
+                try { acquired = file.getChannel().tryLock(); }
+                catch (OverlappingFileLockException e) { throw new Busy(); }
+                if (acquired == null) throw new Busy();
+                lock = acquired;
+            } catch (IOException | RuntimeException e) {
+                try { file.close(); } catch (IOException suppressed) { e.addSuppressed(suppressed); }
+                throw e;
+            }
         }
-        public void close() throws IOException { lock.release(); file.close(); }
+        public void close() throws IOException {
+            try { if (lock.isValid()) lock.release(); } finally { file.close(); }
+        }
     }
 }

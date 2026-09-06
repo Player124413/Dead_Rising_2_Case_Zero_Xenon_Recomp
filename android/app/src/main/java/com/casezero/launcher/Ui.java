@@ -51,7 +51,7 @@ final class Ui {
         });
     }
     static void error(Activity activity, Throwable error) {
-        if (!activity.isFinishing()) new AlertDialog.Builder(activity).setTitle(R.string.error)
+        if (!activity.isFinishing() && !activity.isDestroyed()) new AlertDialog.Builder(activity).setTitle(R.string.error)
             .setMessage(error.getMessage()).setPositiveButton(R.string.close, null).show();
     }
     static void confirm(Activity a, int message, Runnable yes) {
