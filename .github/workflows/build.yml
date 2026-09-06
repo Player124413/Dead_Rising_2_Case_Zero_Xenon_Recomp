@@ -32,7 +32,9 @@ permissions:
 
 concurrency:
   group: host-${{ github.ref }}
-  cancel-in-progress: true
+  # Let an expensive dependency build finish; the next run reuses its cache.
+  # New pushes replace pending runs, not the one currently compiling DXC/FFmpeg.
+  cancel-in-progress: false
 
 env:
   # The upstream commits the vendored patches apply onto (their merge-bases with

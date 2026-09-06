@@ -20,9 +20,10 @@ for arg in sys.argv[1:]:
     lines = text.splitlines()
     selected = set()
     for i, line in enumerate(lines):
-        if re.search(r'(?i)(\berror\b|\bfailed\b|\bfailure\b|\bFAIL\b|shellcheck|SC\d{4}|\.yml:\d)', line):
+        if re.search(r'(?i)(\berror\b(?![.])|\bfailed\b|\bfailure\b|\bFAIL\b|shellcheck|SC\d{4}|\.yml:\d)', line):
             selected.update(range(max(0, i - 1), min(len(lines), i + 5)))
-    excerpt = '\n'.join(lines[i] for i in sorted(selected)) if selected else '\n'.join(lines[-30:])
+    selected.update(range(max(0, len(lines) - 25), len(lines)))
+    excerpt = '\n'.join(lines[i] for i in sorted(selected))
     excerpt = excerpt[-10000:]
     # GitHub can truncate a single annotation to 4 KiB. Split on characters
     # with a byte budget so later errors and UTF-8 text are not silently lost.

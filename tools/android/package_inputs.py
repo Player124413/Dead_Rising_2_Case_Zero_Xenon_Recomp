@@ -2,6 +2,7 @@
 """Stage an explicit native library/license allowlist, never a recursive build-tree copy."""
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -16,6 +17,7 @@ def main():
     ap.add_argument('--mode', choices=['diagnostic', 'game'], required=True)
     ap.add_argument('--deps', type=Path, required=True)
     ap.add_argument('--build', type=Path, required=True)
+    ap.add_argument('--ndk', type=Path, default=os.environ.get('ANDROID_NDK_HOME'))
     args = ap.parse_args()
     dest = ROOT / 'android/generated' / args.mode
     dest.mkdir(parents=True, exist_ok=True)
@@ -50,7 +52,22 @@ def main():
         'DXC.txt': args.deps / 'dxc/LICENSE.TXT',
         'XenonRecomp.txt': args.deps / 'xenon/LICENSE.md',
         'XenosRecomp.txt': args.deps / 'xenos/LICENSE.md',
+        'fmt.txt': args.deps / 'xenon/thirdparty/fmt/LICENSE',
+        'xxHash.txt': args.deps / 'xenon/thirdparty/xxHash/LICENSE',
+        'SIMDe.txt': args.deps / 'xenon/thirdparty/simde/COPYING',
+        'tiny-AES-c.txt': args.deps / 'xenon/thirdparty/tiny-AES-c/unlicense.txt',
+        'libmspack-LGPL-2.1.txt': args.deps / 'xenon/thirdparty/libmspack/libmspack/COPYING.LIB',
+        'liblinkernsbypass.txt': args.deps / 'adrenotools/lib/linkernsbypass/LICENSE',
+        'SPIRV-Tools.txt': args.deps / 'dxc/external/SPIRV-Tools/LICENSE',
+        'SPIRV-Headers.txt': args.deps / 'dxc/external/SPIRV-Headers/LICENSE',
+        'Android-LGPL-replacement.md': ROOT / 'docs/android-lgpl.md',
     }
+    if args.ndk is None:
+        raise SystemExit('Set ANDROID_NDK_HOME or pass --ndk for the bundled libc++ notices')
+    license_files['NDK-NOTICE.txt'] = args.ndk / 'NOTICE'
+    license_files['NDK-TOOLCHAIN-NOTICE.txt'] = args.ndk / 'NOTICE.toolchain'
+    tiny_sha = (args.deps / 'xenon/thirdparty/TinySHA1/TinySHA1.hpp').read_text()
+    (licenses / 'TinySHA1-ISC.txt').write_text(tiny_sha.split('*/', 1)[0] + '*/\n')
     for name, source in license_files.items():
         shutil.copy2(source, licenses / name)
     notice = (ROOT / 'THIRD_PARTY.md').read_text()

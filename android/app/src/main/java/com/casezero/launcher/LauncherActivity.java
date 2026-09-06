@@ -195,8 +195,11 @@ public final class LauncherActivity extends Activity implements InstallService.L
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         int flags = data.getFlags() & (request == EXPORT_SAVES ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if ((data.getFlags() & Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0) {
-            try { getContentResolver().takePersistableUriPermission(uri, flags); } catch (SecurityException e) { android.util.Log.w("CaseZero", "Transient document grant", e); }
+        if (flags != 0 && (data.getFlags() & Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0) {
+            try {
+                if (request == EXPORT_SAVES) getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                else getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (SecurityException e) { android.util.Log.w("CaseZero", "Transient document grant", e); }
         }
         String action;
         switch (request) {

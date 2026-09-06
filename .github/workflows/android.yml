@@ -10,7 +10,9 @@ permissions:
   contents: read
 concurrency:
   group: android-${{ github.ref }}
-  cancel-in-progress: true
+  # Let an expensive dependency build finish; the next run reuses its cache.
+  # New pushes replace pending runs, not the one currently compiling DXC/FFmpeg.
+  cancel-in-progress: false
 jobs:
   android:
     name: ARM64 native + launcher + APK
@@ -72,6 +74,14 @@ jobs:
           apk=android/app/build/outputs/apk/diagnostic/debug/app-diagnostic-debug.apk
           python3 tools/android/verify_apk.py "$apk" --mode diagnostic
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+      - name: Package exact LGPL source and replacement instructions
+        run: python3 tools/android/package_sources.py
+      - name: Publish LGPL source accompanying the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaseZero-Android-LGPL-source
+          path: build/android-open-source/CaseZero-Android-LGPL-sources.zip
+          if-no-files-found: error
       - name: Publish diagnostic APK (NOT a playable game)
         uses: actions/upload-artifact@v4
         with:

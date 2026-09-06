@@ -60,3 +60,7 @@ build-relmatch/
 *.jks
 *.keystore
 __pycache__/
+
+# CI-only logs and the supported vcpkg binary cache
+/*.log
+/.vcpkg-cache/

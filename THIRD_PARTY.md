@@ -99,14 +99,18 @@ an ignored directory, and built from source. Their own notices accompany APKs:
 |---|---|---|
 | SDL 2.32.8 | zlib | Matching Java activity/controller/audio classes and shared native library, unmodified |
 | FFmpeg 7.1.1 | LGPL-2.1-or-later | Shared libavcodec/libavutil, XMA1/XMA2 only; GPL, version3 and nonfree disabled |
+| libmspack LZX | LGPL-2.1-or-later | Separate replaceable `libcz_lzx.so`; no static absorption into the game library |
 | volk | MIT | Vulkan dispatch for the selected system/custom loader |
 | libadrenotools + liblinkernsbypass | BSD-2-Clause | Optional user-supplied Qualcomm driver loading; no driver binary bundled |
 | DirectXShaderCompiler v1.8.2505.1 | LLVM/NCSA and included third-party notices | On-device HLSL to SPIR-V; source-built Android library |
 | Gradle wrapper | Apache-2.0 | Unmodified wrapper scripts/JAR from Gradle v8.9.0, SHA-256-verified distribution |
 
-XenonRecomp's transitive dependencies (fmt, xxHash, tiny-AES-c, SIMDe,
-libmspack, and its disassembler) retain their upstream notices. A production
-redistribution must supply corresponding LGPL source/relink materials as
-applicable, not just a link to this README. The diagnostic build is reproducible
-entirely from public sources and contains no copyrighted game input. Preserve
-all upstream notices when distributing locally built game APKs.
+XenonRecomp's used transitive dependencies (fmt, xxHash, tiny-AES-c, TinySHA1,
+SIMDe and libmspack), DXC's SPIR-V dependencies and NDK libc++ retain their
+upstream notices. The Android loader uses an explicit source list: it does **not**
+compile or link Xenon's binutils-derived GPL disassembler. FFmpeg and LZX remain
+shared and replaceable. CI supplies the exact LGPL source archives and build /
+replacement instructions alongside its APK; see [Android LGPL materials](docs/android-lgpl.md).
+The diagnostic build is reproducible entirely from public sources and contains
+no copyrighted game input. Preserve all upstream notices and the corresponding
+source materials when redistributing locally built APKs.

@@ -8,6 +8,9 @@
     <issue id="MissingPermission">
         <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
         <ignore path="**/org/libsdl/app/HIDDeviceBLESteamController.java" />
+        <!-- The game only opens playback (iscapture=0), never SDL's microphone
+             path. Do not ask users for RECORD_AUDIO to lint unused vendor code. -->
+        <ignore path="**/org/libsdl/app/SDLAudioManager.java" />
     </issue>
     <!-- GameActivity.registerReceiver supplies explicit flags for SDL's Context:
          private USB permission receiver, exported protected Bluetooth ACL events.

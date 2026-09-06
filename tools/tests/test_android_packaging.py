@@ -10,7 +10,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/android'))
-from verify_apk import verify
+from verify_apk import verify, verify_elf, support_inputs
 from package_inputs import LIBRARIES
 
 
@@ -21,6 +21,7 @@ def elf(align=16384, machine=183):
     struct.pack_into('<Q', data, 32, 64)
     struct.pack_into('<HH', data, 54, 56, 1)
     struct.pack_into('<I', data, 64, 1)
+    struct.pack_into('<QQ', data, 96, len(data), len(data))
     struct.pack_into('<Q', data, 112, align)
     return data
 
@@ -31,6 +32,8 @@ class PackagingTest(unittest.TestCase):
         with zipfile.ZipFile(path, 'w') as z:
             z.writestr('assets/build-info.json', json.dumps({'mode': 'diagnostic', 'guest_code': 'stub'}))
             z.writestr('assets/licenses/NOTICE.txt', 'test notice')
+            for name, file in support_inputs().items():
+                z.writestr(name, file.read_bytes())
             for name in LIBRARIES:
                 if name != omit:
                     z.writestr(f'lib/arm64-v8a/lib{name}.so', elf(align, machine))
@@ -44,10 +47,20 @@ class PackagingTest(unittest.TestCase):
 
     def test_fail_closed(self):
         for kwargs in ({'align': 4096}, {'machine': 62}, {'omit': 'main'},
-                       {'extra': 'assets/default.xex'}, {'extra': 'lib/x86_64/accidental.so'}):
+                       {'extra': 'assets/default.xex'}, {'extra': 'lib/x86_64/accidental.so'},
+                       {'extra': 'lib/arm64-v8a/unknown.so'}, {'extra': 'assets/unknown'},
+                       {'extra': '../outside.txt'}, {'extra': 'assets/game/data.bin'}):
             with self.subTest(kwargs=kwargs), tempfile.TemporaryDirectory() as d:
                 with self.assertRaises(ValueError):
                     verify(self.make_apk(d, **kwargs), 'diagnostic')
+
+    def test_malformed_segments(self):
+        for position, value in ((72, 4096), (96, 999999), (104, 1), (112, 24576), (32, 999999)):
+            data = elf()
+            struct.pack_into('<Q', data, position, value)
+            with self.subTest(position=position), self.assertRaises(ValueError):
+                verify_elf(data, 'fixture.so')
+        with self.assertRaises(ValueError): verify_elf(b'\x7fELF', 'short.so')
 
     def test_stub_cannot_be_game(self):
         with tempfile.TemporaryDirectory() as d:
