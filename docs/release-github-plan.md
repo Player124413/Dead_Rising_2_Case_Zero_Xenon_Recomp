@@ -324,3 +324,25 @@ headlessly. The stage's assets/ was then cleaned back to the shipped
 skeleton (their package copy removed after confirming the dev tree holds
 the original; the archive and checksums were never affected — the .tar.zst
 always carried the clean skeleton).
+
+---
+
+## §7 PUBLISHED — the plan is COMPLETE (2026-09-05)
+
+The operator created the Release and flipped the repository public:
+https://github.com/wivi514/Dead_Rising_2_Case_Zero_Xenon_Recomp — Release
+"Dead Rising 2: Case Zero — Native PC Recomp v1.0.0" at tag v1.0.0, both
+artifacts attached. Verified FROM THE OUTSIDE, the way a stranger gets it:
+the README renders with the player-first install flow; both asset URLs
+return HTTP 200 at the right sizes; and both files were downloaded back
+over the public internet and SHA-256 hashed — **byte-identical to the gated
+artifacts** (linux 0d1aa15c…, windows d911ad17…). What the world downloads
+is what the container gate ran.
+
+After (this plan's §5.5, now the standing state): watch the first issues;
+repo topics are still unset (suggested: dead-rising, static-recompilation,
+xbox-360, pc-port, game-preservation, vulkan, reverse-engineering,
+xenonrecomp); macOS remains milestone C (hardware-blocked); Case West
+inherits everything through docs/reusability.md — including this plan's §0
+overlay-generation road, the release packaging, and the whole gate ladder,
+which their part 8 already began importing.
