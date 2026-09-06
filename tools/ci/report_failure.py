@@ -24,5 +24,15 @@ for arg in sys.argv[1:]:
             selected.update(range(max(0, i - 1), min(len(lines), i + 5)))
     excerpt = '\n'.join(lines[i] for i in sorted(selected)) if selected else '\n'.join(lines[-30:])
     excerpt = excerpt[-10000:]
-    escaped = excerpt.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-    print(f'::error title=Build log {path.name}::{escaped}')
+    # GitHub can truncate a single annotation to 4 KiB. Split on characters
+    # with a byte budget so later errors and UTF-8 text are not silently lost.
+    parts, part, size = [], [], 0
+    for char in excerpt:
+        count = len(char.encode('utf-8'))
+        if size + count > 3000:
+            parts.append(''.join(part)); part, size = [], 0
+        part.append(char); size += count
+    if part: parts.append(''.join(part))
+    for index, part in enumerate(parts, 1):
+        escaped = part.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        print(f'::error title=Build log {path.name} ({index}/{len(parts)})::{escaped}')

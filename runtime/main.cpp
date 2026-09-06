@@ -372,12 +372,16 @@ int main(int argc, char** argv)
                                  done, total);
                         Host_ProgressUpdate(l, total ? float(done) / float(total) : 1.f);
                     });
+#ifdef __ANDROID__
                 if (shaderResult != 0)
                 {
                     if (progressWindow) Host_ProgressEnd();
                     fprintf(stderr, "[shaders] Preparation failed; refusing to boot with a partial cache.\n");
                     return 1;
                 }
+#else
+                (void)shaderResult; // preserve desktop's existing first-sight fallback policy
+#endif
             }
         }
         // Release-github §0: the patched-asset overlays (the PC options screen,

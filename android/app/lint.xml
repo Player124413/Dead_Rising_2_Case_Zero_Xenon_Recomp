@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- SDL is pinned and unmodified. Its manager checks BLUETOOTH_CONNECT
+         before constructing/enabling BLE devices; the launcher obtains the
+         grant explicitly. Lint cannot follow that gate into asynchronous GATT
+         callbacks. Revoking the runtime grant terminates the app process.
+         Keep MissingPermission enabled everywhere in our own app. -->
+    <issue id="MissingPermission">
+        <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
+        <ignore path="**/org/libsdl/app/HIDDeviceBLESteamController.java" />
+    </issue>
+    <!-- GameActivity.registerReceiver supplies explicit flags for SDL's Context:
+         private USB permission receiver, exported protected Bluetooth ACL events.
+         Static lint sees Context.registerReceiver, not the Activity override. -->
+    <issue id="UnspecifiedRegisterReceiverFlag">
+        <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
+    </issue>
+</lint>
