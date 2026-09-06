@@ -1593,7 +1593,7 @@ void GenerateKbmLayer(const Paths& p,
 // art change (re-export tools/release/kbm_chips with gen_kbm_icons.py
 // --export-chips in the same commit): a shipped update must not keep serving a
 // player's stale banks (the gotcha-13 shape, on disk).
-constexpr int kGeneratorVersion = 1;
+constexpr int kGeneratorVersion = 2;   // 2: y_button_ig legended Q (CW 112d47a)
 
 fs::path StampPath(const Paths& p)
 {

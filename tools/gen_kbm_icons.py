@@ -70,7 +70,9 @@ generated key map — see docs/native-kbm-phaseA.md):
                   LT=RMB (aim)              RT=LMB (fire)
   butstart=ENTER  butback=TAB  dpads=arrow keys  R3=MMB (heavy attack)
   analog_move_center=BLANK  analog_move_left=A  analog_move_right=D (struggle flash; label MASH)
-  UNPATCHED (no keyboard equivalent bound): L3, y_button_ig.
+  y_button_ig=Q (Case West 112d47a: the in-game Y actions — callout, hand-to-hand
+  Y — are bound to KEY_Q, so the prompt was showing Xbox art for a working key)
+  UNPATCHED (no keyboard equivalent bound): L3.
 
 Usage:
     python3 tools/gen_kbm_icons.py             # gates + write the patched bank
@@ -101,6 +103,7 @@ LEGENDS = {
     "x_button": ("key", "X"),
     "x_button_ig": ("mouse", "L"),
     "y_button": ("key", "C"),
+    "y_button_ig": ("key", "Q"),
     "butstart": ("key", "ENTER"),
     "butback": ("key", "TAB"),
     "dpad_up": ("key", "↑"),
