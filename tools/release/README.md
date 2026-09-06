@@ -8,24 +8,36 @@ with the Xbox 360's GPU commands translated to Vulkan.
 **This build ships no game data.** You supply your own copy of the game, and the first
 run turns it into everything else it needs.
 
+**The port is essentially complete**: the game is 100% playable start to finish and
+should look right in nearly all places. A few minor known issues remain (a subtle
+hair-shading flicker; the odd spot that shades slightly differently than the
+console); none block progress.
+
 ## Requirements
 
-* x86-64 Linux with a working **Vulkan** driver (if `vulkaninfo` works, you are fine).
+* An x86-64 PC (Windows 10+ or Linux) with a working **Vulkan** driver (on Linux: if
+  `vulkaninfo` works, you are fine).
 * Your own copy of the **Dead Rising 2: Case Zero** XBLA package (title ID `58410A8D`).
   It is the ~825 MB file your Xbox 360 downloaded; on the console's storage it lives at
   `Content/0000000000000000/58410A8D/000D0000/<a long hash, no file extension>`.
-* A game controller is strongly recommended (anything SDL recognises — XInput layout).
-  A keyboard fallback exists; the exact key map is printed in the terminal at startup.
+* **Keyboard/mouse or a controller — both are first-class.** The keyboard uses the
+  Dead Rising 2 PC scheme (WASD + mouse look, left-click attack, right-click aim,
+  Space jump, E use; the full map prints in the terminal at startup, and `kbmap.txt`
+  next to the executable rebinds it). Any controller SDL recognises (Xbox layout)
+  works too, and on-screen prompts switch between key and button art automatically
+  depending on which device you touched last.
 
 ## Quick start
 
-1. Run `./cz_runtime`. The **launcher** opens: pick your display mode, resolution and
+1. Run the game — `cz_runtime.exe` on Windows, `./cz_runtime` on Linux. The
+   **launcher** opens: pick your display mode, resolution and
    other settings, and **drag your XBLA package file onto the window** to install the
    game (putting it in `assets/package/` by hand works too).
 2. Press PLAY.
-3. The first run does three things, once, with progress shown as it goes:
+3. The first run sets everything up, once, with progress shown as it goes:
    * unpacks the package (825 MB in, ~832 MB out),
    * prepares the game's shaders from its own disc data (1,265 of them, ~10 s),
+   * generates the patched menu and key-prompt assets from your own game data,
    * warms up as you play — entering a new area for the first time may translate a
      few more shaders on the fly (a fraction of a second each; the log says
      `first-sight translation` when it happens).
@@ -84,7 +96,7 @@ a terminal and include the output.
 
 ## What is in this bundle
 
-* `cz_runtime` — the game: recompiled code plus the host runtime.
+* `cz_runtime` / `cz_runtime.exe` — the game: recompiled code plus the host runtime.
 * `lib/` — bundled libraries (SDL2, an LGPL ffmpeg build for the 360's XMA audio, the
   DirectX Shader Compiler used to translate shaders). Licenses are alongside, and
   `THIRD_PARTY.md` lists everything with provenance.
