@@ -14,24 +14,26 @@ class PausedClock {
     std::atomic<uint64_t> sequence_{0}, transition_{0}, excluded_{0};
     std::atomic<bool> paused_{false};
 public:
-    void SetPaused(bool value, uint64_t now) {
+    template<class Counter> void SetPaused(bool value, Counter counter) {
         std::lock_guard<std::mutex> lock(writer_);
         if (paused_.load() == value) return;
         sequence_.fetch_add(1);
-        now = std::max(now, transition_.load());
+        // Sample INSIDE the odd sequence. Sampling in the caller lets a reader
+        // see a later time before the freeze is published, then go backwards.
+        const uint64_t now = std::max(counter(), transition_.load());
         if (!value) excluded_.fetch_add(now - transition_.load());
         transition_.store(now);
         paused_.store(value);
         sequence_.fetch_add(1);
     }
-    uint64_t Read(uint64_t now) const {
+    template<class Counter> uint64_t Read(Counter counter) const {
         for (;;) {
             const uint64_t version = sequence_.load();
             if (version & 1) continue;
             const bool paused = paused_.load();
             const uint64_t transition = transition_.load(), excluded = excluded_.load();
-            if (sequence_.load() == version)
-                return (paused ? transition : std::max(now, transition)) - excluded;
+            const uint64_t now = paused ? transition : std::max(counter(), transition);
+            if (sequence_.load() == version) return now - excluded;
         }
     }
 };

@@ -35,8 +35,8 @@ uint64_t host_rdtsc()
 
 #ifdef __ANDROID__
 namespace { PausedClock backgroundClock; }
-uint64_t running_host_ticks() { return backgroundClock.Read(host_rdtsc()); }
-void set_paused(bool value) { backgroundClock.SetPaused(value, host_rdtsc()); }
+uint64_t running_host_ticks() { return backgroundClock.Read(host_rdtsc); }
+void set_paused(bool value) { backgroundClock.SetPaused(value, host_rdtsc); }
 #endif
 
 namespace {
