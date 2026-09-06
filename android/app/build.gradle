@@ -76,7 +76,7 @@ android.applicationVariants.all { variant ->
             def info = new File(base, 'assets/build-info.json')
             if (!info.isFile() || new groovy.json.JsonSlurper().parse(info).mode != mode)
                 throw new GradleException("Run tools/android/build.sh ${mode} first (no matching native build-info)")
-            ['main', 'cz_support', 'SDL2', 'c++_shared', 'avcodec', 'avutil', 'dxcompiler',
+            ['main', 'cz_support', 'cz_lzx', 'SDL2', 'c++_shared', 'avcodec', 'avutil', 'dxcompiler',
              'main_hook', 'hook_impl', 'file_redirect_hook', 'gsl_alloc_hook'].each { lib ->
                 if (!new File(base, "jniLibs/arm64-v8a/lib${lib}.so").isFile())
                     throw new GradleException("Missing Android ARM64 lib${lib}.so; run tools/android/build.sh ${mode}")

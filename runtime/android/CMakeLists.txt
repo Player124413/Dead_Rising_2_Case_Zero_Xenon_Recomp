@@ -42,8 +42,23 @@ set(SDL_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${CZ_ANDROID_DEPS}/sdl" "sdl")
 # Build only the XEX loader with the TARGET compiler, not XenonRecomp's host tools.
 set(THIRDPARTY_ROOT "${XENON_ROOT}/thirdparty")
-add_subdirectory("${THIRDPARTY_ROOT}" "xenon-thirdparty")
-add_subdirectory("${XENON_ROOT}/XenonUtils" "XenonUtils")
+add_subdirectory("${THIRDPARTY_ROOT}/fmt" "xenon-fmt")
+add_subdirectory("${THIRDPARTY_ROOT}/xxHash/cmake_unofficial" "xenon-xxhash")
+# Only the loader is needed. Do not compile/link Xenon's binutils-derived GPL
+# disassembler, or statically absorb LGPL libmspack into the game library.
+add_library(cz_lzx SHARED "${THIRDPARTY_ROOT}/libmspack/libmspack/mspack/lzxd.c")
+target_include_directories(cz_lzx PUBLIC "${THIRDPARTY_ROOT}/libmspack/libmspack/mspack")
+add_library(XenonUtils STATIC
+    "${XENON_ROOT}/XenonUtils/xex.cpp"
+    "${XENON_ROOT}/XenonUtils/image.cpp"
+    "${XENON_ROOT}/XenonUtils/xdbf_wrapper.cpp"
+    "${XENON_ROOT}/XenonUtils/xex_patcher.cpp"
+    "${XENON_ROOT}/XenonUtils/memory_mapped_file.cpp"
+    "${THIRDPARTY_ROOT}/tiny-AES-c/aes.c")
+target_include_directories(XenonUtils PUBLIC "${XENON_ROOT}/XenonUtils" "${THIRDPARTY_ROOT}/simde"
+    PRIVATE "${THIRDPARTY_ROOT}/tiny-AES-c" "${THIRDPARTY_ROOT}/TinySHA1")
+target_compile_definitions(XenonUtils PRIVATE NOMINMAX)
+target_link_libraries(XenonUtils PRIVATE cz_lzx)
 add_subdirectory("${CZ_ANDROID_DEPS}/adrenotools" "adrenotools")
 add_library(cz_volk STATIC "${CZ_ANDROID_DEPS}/volk/volk.c")
 target_include_directories(cz_volk PUBLIC "${CZ_ANDROID_DEPS}/volk")
@@ -59,7 +74,7 @@ target_link_libraries(cz_support PRIVATE cz_android_vulkan log)
 target_compile_definitions(cz_support PRIVATE CZ_DIAGNOSTIC=$<BOOL:${CZ_ALLOW_STUB_PPC}>)
 target_link_options(cz_support PRIVATE "-Wl,--no-undefined")
 # APK libraries are an explicit set, never a recursive find that can pick up host binaries.
-foreach(lib cz_runtime cz_support SDL2 hook_impl main_hook file_redirect_hook gsl_alloc_hook)
+foreach(lib cz_runtime cz_support cz_lzx SDL2 hook_impl main_hook file_redirect_hook gsl_alloc_hook)
     set_target_properties(${lib} PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CZ_NATIVE_OUTPUT_DIR}")
 endforeach()
 file(MAKE_DIRECTORY "${CZ_NATIVE_OUTPUT_DIR}")

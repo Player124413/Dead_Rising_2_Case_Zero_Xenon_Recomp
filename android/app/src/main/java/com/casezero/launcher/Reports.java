@@ -33,7 +33,8 @@ final class Reports {
     }
     static void share(Context c, android.net.Uri uri) {
         Intent i = new Intent(Intent.ACTION_SEND).setType("application/zip").putExtra(Intent.EXTRA_STREAM, uri)
-            .setClipData(ClipData.newRawUri("Case Zero diagnostics", uri)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        i.setClipData(ClipData.newRawUri("Case Zero diagnostics", uri));
         c.startActivity(Intent.createChooser(i, c.getString(R.string.share_logs)));
     }
     private static void add(ZipOutputStream zip, String name, byte[] bytes) throws IOException {

@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LIBRARIES = ['main', 'cz_support', 'SDL2', 'c++_shared', 'avcodec', 'avutil', 'dxcompiler',
+LIBRARIES = ['main', 'cz_support', 'cz_lzx', 'SDL2', 'c++_shared', 'avcodec', 'avutil', 'dxcompiler',
              'main_hook', 'hook_impl', 'file_redirect_hook', 'gsl_alloc_hook']
 
 

@@ -110,7 +110,8 @@ final class Updates {
             throw new IOException(c.getString(R.string.unknown_sources));
         }
         Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-            .setClipData(ClipData.newRawUri("Verified update", uri)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setClipData(ClipData.newRawUri("Verified update", uri));
         c.startActivity(intent);
     }
     private Updates() {}
