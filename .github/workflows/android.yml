@@ -42,7 +42,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: thirdparty/android
-          key: android-ndk27-${{ hashFiles('tools/android/dependencies.json', 'tools/android/bootstrap.py', 'tools/android/build_ffmpeg.sh', 'tools/android/build_dxc.sh', 'tools/ci/*.patch') }}
+          key: android-ndk27-${{ hashFiles('tools/android/dependencies.json', 'tools/android/bootstrap.py', 'tools/android/build_ffmpeg.sh', 'tools/android/build_dxc.sh', 'tools/ci/*.patch') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: android-ndk27-${{ hashFiles('tools/android/dependencies.json', 'tools/android/bootstrap.py', 'tools/android/build_ffmpeg.sh', 'tools/android/build_dxc.sh', 'tools/ci/*.patch') }}
       - name: Fetch locked sources (no game inputs)
         id: bootstrap
         run: |
@@ -54,7 +55,7 @@ jobs:
           set -o pipefail
           tools/android/build.sh diagnostic 2>&1 | tee android-native.log
       - name: Save native dependency build cache
-        if: always() && steps.bootstrap.outcome == 'success' && steps.deps.outputs.cache-hit != 'true'
+        if: always() && steps.bootstrap.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: thirdparty/android

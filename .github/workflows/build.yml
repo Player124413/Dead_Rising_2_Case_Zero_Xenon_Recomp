@@ -123,11 +123,14 @@ jobs:
 
       # vcpkg's old x-gha binary provider was removed upstream. Cache its
       # supported files provider instead, and pin ports/tooling together.
-      - uses: actions/cache@v4
+      # 2026-09-04 pin: the old 2024 baseline downloads MSYS2 files that now 404.
+      # [core,avcodec] avoids unrelated avformat/avdevice/tools dependencies.
+      - uses: actions/cache/restore@v4
+        id: vcpkg-cache
         with:
           path: ${{ github.workspace }}/.vcpkg-cache
-          key: windows-vcpkg-b322364f-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: windows-vcpkg-b322364f-
+          key: windows-vcpkg-04a9d8e5-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: windows-vcpkg-04a9d8e5-
 
       - name: install pinned vcpkg and native dependencies
         shell: pwsh
@@ -138,14 +141,21 @@ jobs:
           $root = "$env:RUNNER_TEMP/cz-vcpkg"
           git clone https://github.com/microsoft/vcpkg $root
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C $root checkout b322364f06308bdd24823f9d8f03fe0cc86fd46f
+          git -C $root checkout 04a9d8e5212d01ee1dd9478eadd9caade4f8b0d4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$root/bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & "$root/vcpkg.exe" install 'sdl2:x64-windows' 'ffmpeg[avcodec]:x64-windows' `
+          & "$root/vcpkg.exe" install 'sdl2:x64-windows' 'ffmpeg[core,avcodec]:x64-windows' `
             'vulkan-headers:x64-windows' 'vulkan-loader:x64-windows' 2>&1 | Tee-Object vcpkg.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "VCPKG_INSTALLATION_ROOT=$root" >> $env:GITHUB_ENV
+
+      - name: Keep compiled dependencies even if a later compile fails
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
       - name: clone recompilers at pinned bases and apply local patches
         shell: bash

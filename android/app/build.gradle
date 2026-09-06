@@ -83,6 +83,9 @@ android.applicationVariants.all { variant ->
             }
         }
     }
-    variant.mergeAssetsProvider.configure { dependsOn(checkInputs) }
+    // JVM tests/lint may merge resources/assets but must not require the engine.
+    // Attach the guard to the actual APK/AAB packaging tasks, never bypass it.
+    variant.packageApplicationProvider.configure { dependsOn(checkInputs) }
+    tasks.matching { it.name == "package${variant.name.capitalize()}Bundle" }.configureEach { dependsOn(checkInputs) }
 }
 dependencies { testImplementation 'junit:junit:4.13.2' }

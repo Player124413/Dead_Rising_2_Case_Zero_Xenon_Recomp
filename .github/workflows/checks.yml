@@ -34,3 +34,41 @@ jobs:
           build/portable-tests/cz_portable_tests build/portable-tests/fixtures
       - name: Test APK verification, translations and build-mode guards
         run: python3 -m unittest discover -s tools/tests -v
+
+  launcher:
+    name: Launcher JVM tests and Android lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch matching SDL Java API and SDK (no native build required)
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          python3 - <<'PYTHON'
+          from tools.android.bootstrap import sync, LOCK, ROOT
+          sync('sdl', LOCK['sdl'], ROOT / 'thirdparty/android')
+          PYTHON
+      - name: Compile launcher, run importer tests and lint
+        working-directory: android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace testDiagnosticDebugUnitTest lintDiagnosticDebug 2>&1 | tee ../launcher-tests.log
+      - name: Expose launcher errors through the checks API
+        if: failure()
+        run: python3 tools/ci/report_failure.py launcher-tests.log
+      - name: Keep JVM and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Launcher-tests
+          if-no-files-found: ignore
+          path: |
+            launcher-tests.log
+            android/app/build/reports/
+            android/app/build/test-results/
