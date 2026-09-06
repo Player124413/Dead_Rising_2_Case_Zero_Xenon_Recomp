@@ -1,11 +1,12 @@
-# Release notes — v1.0.0 (draft, release-github-plan §5.2)
+# Release notes — v1.0.0 (FINAL, release-github-plan §5.2)
 
-This is the text to paste into the GitHub Release body when the operator creates
-it. The SHA-256 lines are current as of the post-§3-fix rebuild (2026-09-05, commit
-`407eb79` binaries — string-follow, always-on mouse, and the Case West imports:
-XMA hardware loops, LRU texture-slot recycling, the Q glyph for in-game Y); **if either artifact is rebuilt after the §3 operator
-sitting, refresh its hash here first** (`sha256sum dist/*.tar.zst` /
-`Get-FileHash` on czwin).
+**This is the text to paste into the GitHub Release body.** Final as of
+2026-09-05, operator instruction: *"this will truly be our 1.0.0."* Binaries are
+commit `407eb79`: the fix round of 2026-09-05 is fully in — the device-following
+prompt wording (MASH on keyboard only), the always-on mouse camera, and the Case
+West back-imports (XMA hardware loops, LRU texture-slot recycling, the Q glyph
+for the in-game Y prompt). Both artifacts sit in `dist/` with the checksums
+below; if either is EVER rebuilt, refresh its hash here before attaching.
 
 ---
 
@@ -27,8 +28,10 @@ these downloads; the runtime reads everything from your own XBLA package
   pixel shaders built at first run), EDRAM tiling semantics, cube-map
   snapshots, deferred scoped clears, parallel command recording, and a frame
   that holds 60 fps at 1440p through the heaviest crowds on the dev machine.
-- **Audio**: real XMA decoding through ffmpeg — music, speech, effects, and
-  the cinematics that gate on them.
+- **Audio**: real XMA decoding through ffmpeg — music, speech, effects,
+  hardware-looped voices, and the cinematics that gate on them.
+- **Built for the long haul**: texture memory recycles over a full playthrough
+  (no whitening or slowdown on marathon sessions).
 - **Save/load**: full round trip, relocated to the per-user directory.
 - **60 fps**: the title's own present-interval configuration, surfaced as a
   setting (30/60/90/120/240/480 or off).

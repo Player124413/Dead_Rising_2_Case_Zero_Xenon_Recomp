@@ -292,3 +292,24 @@ y_button_ig (their 112d47a — our map binds the in-game Y actions to KEY_Q;
 their epilogue photo-camera bindings and generator table addresses (Case
 West-only), and everything that was already ours. Both artifacts rebuilt at
 407eb79 and re-gated. SHAs: linux 5bd1a507…, windows 6a3c03ba….
+
+**Addendum 4 — THE RELEASE IS PREPARED AND TAGGED (2026-09-05, operator:
+"Now that we really got all the fix re-prepare the release with these new
+thing this will truly be our 1.0.0").** Final state: both artifacts at
+commit 407eb79 sit together in dist/ (the Windows zip pulled from czwin,
+checksum verified on arrival: linux 5bd1a507…, windows 6a3c03ba…);
+docs/release-notes-v1.0.0.md is FINAL (the paste-ready body, fix round
+included); the tag v1.0.0 is pushed at the release commit. The operator's
+declaration supersedes §3.1/§3.2 as formal gates — their fix-round sittings
+were the verification ("we really got all the fix") — though a bundle save
+round-trip remains a cheap sanity check if any doubt surfaces. WHAT REMAINS
+IS THE OPERATOR'S THREE CLICKS, in order:
+1. github.com → the repo → Releases → "Draft a new release" → choose tag
+   v1.0.0 (it exists), title: Dead Rising 2: Case Zero — Native PC Port
+   v1.0.0.
+2. Paste the body from docs/release-notes-v1.0.0.md (everything below its
+   `---`), attach dist/CaseZeroRecomp-linux-x86_64.tar.zst and
+   dist/CaseZeroRecomp-windows-x86_64.zip, publish.
+3. Settings → General → Danger Zone → Change visibility → Public. (Confirm
+   CI shows green on the release commit first — no gh here, so the checks
+   tab is the one thing only the operator can see.)
