@@ -66,11 +66,18 @@ game folder at any time without losing progress.
 
 - The **whole game**: Still Creek, combo weapons, cinematics, save/load —
   completable start to finish.
+- **Level cap raised to 50** (the original XBLA release stopped Chuck at
+  level 5) with all fifteen skills unlockable — Case Zero as a full game,
+  not a demo-sized one.
 - **60 fps** (the game's own hidden mode, surfaced) — the original 30 fps
   pacing remains available as a setting, along with higher caps.
 - **The restored PC options screen**: the Xbox build ships a dormant PC
   graphics menu; this port revives it in-game — resolution (720p up to 5K,
   applies live without a restart), display mode, vsync, shadow quality.
+- **21:9 ultrawide support** — pick an ultrawide resolution (e.g. 3440×1440)
+  and the game renders true widescreen. **Tip:** raise Field of View to at
+  least **+10** in the options when playing ultrawide — at the stock FOV the
+  wider frame stretches Chuck; +10 or more makes it look great.
 - **MSAA 2x anti-aliasing** by default, adjustable field of view, a settings
   launcher, and a pipeline pre-warm so even your first session plays smoothly.
 - **Real Xbox 360 audio** (XMA) through ffmpeg — music, speech, effects,
@@ -124,6 +131,13 @@ ledger, the 500-entry gotcha list, the `.big`/STFS/XEX format notes, the
 renderer and audio build-out records, and the measurement discipline that kept
 it honest. Start with `docs/xenia-capture-analysis.md` and `docs/gotchas.md`.
 The original day-1 dev README is preserved at `docs/dev-readme-day1.md`.
+
+## Support the project
+
+If this port made your day and you'd like to support the work,
+[**sponsor me on GitHub**](https://github.com/sponsors/wivi514) — it helps
+keep improvements coming (and future ports: Dead Rising 2: Case West is
+next). Bug reports and issues are just as valuable.
 
 ## Credits and licensing
 
