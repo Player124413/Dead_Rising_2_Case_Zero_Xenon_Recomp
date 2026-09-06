@@ -5,8 +5,9 @@
 commit `407eb79`: the fix round of 2026-09-05 is fully in — the device-following
 prompt wording (MASH on keyboard only), the always-on mouse camera, and the Case
 West back-imports (XMA hardware loops, LRU texture-slot recycling, the Q glyph
-for the in-game Y prompt). Both artifacts sit in `dist/` with the checksums
-below; if either is EVER rebuilt, refresh its hash here before attaching.
+for the in-game Y prompt). Both artifacts sit in `dist/` and `~/Release/` with the checksums below
+(repackaged once post-tag for the player-facing README rewrite — binaries
+unchanged); if either is EVER rebuilt, refresh its hash here before attaching.
 
 ---
 
@@ -75,6 +76,6 @@ XenosRecomp.
 ### Checksums (SHA-256)
 
 ```
-5bd1a50729fa460b0b3d409313a32c1ee07e2c51e0a93b2fc2898d6055b17ea3  CaseZeroRecomp-linux-x86_64.tar.zst
-6a3c03ba314263496355835f1f4bbbf97b4c5b654f3c04e611eccec1c633b170  CaseZeroRecomp-windows-x86_64.zip
+0d1aa15c2d233d9686d516107f441b0b5b07fee05484087b668675c06037758f  CaseZeroRecomp-linux-x86_64.tar.zst
+d911ad171b66a9058c7b92c9f8a82ca13335ffa6fd19aca20b012c04cb9d1869  CaseZeroRecomp-windows-x86_64.zip
 ```
