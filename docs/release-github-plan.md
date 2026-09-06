@@ -313,3 +313,14 @@ IS THE OPERATOR'S THREE CLICKS, in order:
 3. Settings → General → Danger Zone → Change visibility → Public. (Confirm
    CI shows green on the release commit first — no gh here, so the checks
    tab is the one thing only the operator can see.)
+
+**Addendum 5 (2026-09-05, post-tag): the operator verified the first run on
+the v1.0.0 artifact itself.** They dropped their package into the staged
+Linux bundle's assets/package and let the automatic flow run — extract,
+disc shader build, overlay generation — and reported *"It works
+perfectly."* That is the §0 road exercised end to end by a human on the
+shipped artifact, closing the loop the container gate could only prove
+headlessly. The stage's assets/ was then cleaned back to the shipped
+skeleton (their package copy removed after confirming the dev tree holds
+the original; the archive and checksums were never affected — the .tar.zst
+always carried the clean skeleton).
